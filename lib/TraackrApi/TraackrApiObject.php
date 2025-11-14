@@ -270,4 +270,136 @@ abstract class TraackrApiObject
 
         return $this->request('DELETE', $url, $options, false);
     }
+
+    private function processNdjsonBuffer($ndjsonBuffer, $entityKey = 'influencers')
+    {
+        $mergedResponse = [
+            $entityKey => [],
+            'errors' => [],
+            'count' => 0,
+        ];
+
+        // Dividimos el buffer por saltos de línea
+        $lines = explode("\n", $ndjsonBuffer);
+
+        foreach ($lines as $line) {
+            if (empty(trim($line))) {
+                continue; // Ignorar líneas vacías
+            }
+
+            $jsonLine = json_decode($line, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $mergedResponse['errors'][] = [
+                    'message' => 'Failed to decode JSON line: ' . json_last_error_msg(),
+                    'line' => $line
+                ];
+                continue;
+            }
+
+            // Asumimos que cada línea tiene una estructura { "influencers": [...] }
+            if (isset($jsonLine[$entityKey]) && is_array($jsonLine[$entityKey])) {
+                $mergedResponse[$entityKey] = array_merge(
+                    $mergedResponse[$entityKey],
+                    $jsonLine[$entityKey]
+                );
+            }
+            
+            // Acumulamos el conteo si existe
+            if (isset($jsonLine['count'])) {
+                $mergedResponse['count'] += (int)$jsonLine['count'];
+            }
+        }
+
+        return $mergedResponse;
+    }
+
+
+    public function postStream($url, $params = [], $entityKey = 'influencers')
+    {
+        $logger = TraackrAPI::getLogger();
+
+        // 1. Añadir API key al query string de la URL
+        $api_key = TraackrApi::getApiKey();
+        if (!empty($api_key)) {
+            $url .= '?' . PARAM_API_KEY . '=' . $api_key;
+        }
+
+        // 2. Preparar parámetros (bools a strings)
+        $params = $this->prepareParameters($params);
+
+        // 3. Opciones de Guzzle para la solicitud
+        $options = [
+            // Usar 'form_params' para 'application/x-www-form-urlencoded'
+            'form_params' => $params,
+            
+            // --- ¡LA CLAVE! ---
+            // Pedir a Guzzle que no descargue todo, sino que nos dé el "grifo"
+            'stream' => true, 
+            
+            'headers' => array_merge(
+                ['Content-Type' => 'application/x-www-form-urlencoded;charset=utf-8'],
+                TraackrApi::getExtraHeaders()
+            )
+        ];
+
+        // Logueamos antes de la llamada
+        $logger->debug('Calling (POST-STREAM): ' . $url . ' [' . http_build_query($params) . ']');
+        
+        $rawNdjsonBuffer = '';
+
+        try {
+            // 4. Hacer la llamada
+            $response = $this->client->request('POST', $url, $options);
+            
+            // 5. Obtener el cuerpo (el "grifo" de datos)
+            $bodyStream = $response->getBody();
+
+            // 6. Leer del "grifo" en trozos (chunks) hasta que se acabe
+            while (!$bodyStream->eof()) {
+                $rawNdjsonBuffer .= $bodyStream->read(1024); // Leemos en trozos de 1KB
+            }
+            
+            $httpcode = $response->getStatusCode(); // Debería ser 2xx
+
+        } catch (ClientException | ServerException $e) {
+            // 7. Manejar errores 4xx/5xx
+            $response = $e->getResponse();
+            $httpcode = $response->getStatusCode();
+            // Leer el cuerpo del error (Guzzle lo bufferea en caso de error)
+            $errorMessage = $response->getBody()->getContents();
+
+            // Re-implementar la lógica de errores del cURL original
+            if ($httpcode === 400) {
+                if ($errorMessage === 'Customer key not found') {
+                    throw new InvalidCustomerKeyException('Invalid Customer Key (HTTP 400): ' . $errorMessage, $httpcode, $e);
+                }
+                throw new MissingParameterException('Missing or Invalid argument/parameter (HTTP 400): ' . $errorMessage, $httpcode, $e);
+            }
+            if ($httpcode === 403) {
+                throw new InvalidApiKeyException('Invalid API key (HTTP 403): ' . $errorMessage, $httpcode, $e);
+            }
+            if ($httpcode === 404) {
+                throw new NotFoundException('API resource not found (HTTP 404): ' . $url, $httpcode, $e);
+            }
+            // Error general
+            throw new TraackrApiException('API HTTP Error (HTTP ' . $httpcode . '): ' . $errorMessage, $httpcode, $e);
+
+        } catch (RequestException $e) {
+            // 8. Manejar errores de red (timeout, DNS, etc.)
+            $message = 'API stream call failed: ' . $e->getMessage();
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
+        }
+
+        // 9. Procesar la respuesta exitosa (igual que en el original)
+        
+        // Si la API está configurada para devolver JSON crudo, devolvemos el buffer
+        if (TraackrAPI::isJsonOutput()) {
+            return $rawNdjsonBuffer;
+        }
+
+        // Si no, procesamos el buffer NDJSON con nuestro método helper
+        // Pasamos el buffer como argumento, ya no usamos una propiedad de clase
+        return $this->processNdjsonBuffer($rawNdjsonBuffer, $entityKey);
+    }
 }
