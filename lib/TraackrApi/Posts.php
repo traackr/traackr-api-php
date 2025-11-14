@@ -139,4 +139,63 @@ class Posts extends TraackrApiObject {
       return $posts->post(TraackrApi::$apiBaseUrl.'posts/search', $p);
 
    }
+
+   public static function stream($p = array(
+      // Defaults consolidados de lookup y search
+      'is_tag_prefix' => false,
+      'lang' => 'all',
+      'include_entities' => false,
+      'include_keyword_matches' => false, // de search
+      'batch_size' => 25, // 'count' ahora es 'batch_size'
+      'sort' => 'date' // de search
+   )) {
+
+      $posts = new Posts();
+      $p = $posts->addCustomerKey($p);
+
+      // --- 1. Sanitización de Booleanos (Superset) ---
+      $p['is_tag_prefix'] = $posts->convertBool($p, 'is_tag_prefix');
+      $p['include_entities'] = $posts->convertBool($p, 'include_entities');
+      $p['include_brand_content'] = $posts->convertBool($p, 'include_brand_content');
+      $p['include_shared_content'] = $posts->convertBool($p, 'include_shared_content');
+      $p['use_alternate_vit'] = $posts->convertBool($p, 'use_alternate_vit');
+      $p['include_keyword_matches'] = $posts->convertBool($p, 'include_keyword_matches'); // (de search)
+
+      // --- 2. Conversión de Arrays (Superset) ---
+      // Lista consolidada de todos los parámetros que pueden ser arrays
+      $multiParams = [
+         // Comunes
+         'influencers',
+         'tags',
+         'tags_exclusive',
+         'root_urls_inclusive',
+         'root_urls_exclusive',
+         'publication_types_inclusive',
+         'publication_types_exclusive',
+         'posts_inclusive',
+         'posts_exclusive',
+         // Solo de search
+         'keywords',
+         'exclusion_keywords'
+      ];
+
+      foreach ($multiParams as $param) {
+         if (isset($p[$param]) && is_array($p[$param])) {
+            $p[$param] = implode(',', $p[$param]);
+         }
+      }
+      
+      // --- 3. Booleano final (común en ambos) ---
+      if (isset($p['enable_regional_country_exclusions'])) {
+         $p['enable_regional_country_exclusions'] = $posts->convertBool($p, 'enable_regional_country_exclusions');
+      }
+
+      // --- 4. Llamada al endpoint de STREAMING ---
+      // Se llama a postStream, pasando 'posts' como la clave de entidad
+      return $posts->postStream(
+         TraackrApi::$apiBaseUrl . 'posts/stream',
+         $p,
+         'posts' // Clave de entidad para el procesador ndjson
+      );
+   }
 }
