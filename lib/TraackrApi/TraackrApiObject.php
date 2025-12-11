@@ -382,19 +382,39 @@ abstract class TraackrApiObject
 
         $logger->debug('Calling (POST-STREAM): ' . $url . ' [' . http_build_query($params) . ']');
         
-        $rawNdjsonBuffer = '';
-
         try {
             $response = $this->client->request('POST', $url, $options);
-            
             $bodyStream = $response->getBody();
+            
+            $buffer = '';
+            
             while (!$bodyStream->eof()) {
-                $rawNdjsonBuffer .= $bodyStream->read(1024); // Read 1KB at a time
+                $chunk = $bodyStream->read(8192);
+                $buffer .= $chunk;
+
+                var_dump($buffer);
+                
+                while (($newlinePos = strpos($buffer, "\n")) !== false) {
+                    $line = substr($buffer, 0, $newlinePos);
+                    
+                    $buffer = substr($buffer, $newlinePos + 1);
+                    
+                    if (trim($line) !== '') {
+                        $data = json_decode($line, true);
+                        if ($data) {
+                            yield $data;
+                        }
+                    }
+                }
             }
             
-            $httpcode = $response->getStatusCode();
-
-        } catch (ClientException | ServerException $e) {
+            if (trim($buffer) !== '') {
+                 $data = json_decode($buffer, true);
+                 if ($data) {
+                     yield $data;
+                 }
+            }
+        } catch (BadResponseException $e) {
             $response = $e->getResponse();
             $httpcode = $response->getStatusCode();
             $errorMessage = $response->getBody()->getContents();
@@ -425,7 +445,7 @@ abstract class TraackrApiObject
         
         // If the API is configured to return raw JSON, return the buffer
         if (TraackrAPI::isJsonOutput()) {
-            return $rawNdjsonBuffer;
+            return $data;
         }
 
         // If not, process the NDJSON buffer with our helper method
