@@ -7,6 +7,9 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\RequestException;
 use Psr\Http\Message\ResponseInterface;
+use Halaxa\JsonMachine\JsonMachine;
+use GuzzleHttp\Psr7\StreamWrapper;
+use JsonMachine\Items;
 
 abstract class TraackrApiObject
 {
@@ -384,35 +387,23 @@ abstract class TraackrApiObject
         
         try {
             $response = $this->client->request('POST', $url, $options);
-            $bodyStream = $response->getBody();
-            
-            $buffer = '';
-            
-            while (!$bodyStream->eof()) {
-                $chunk = $bodyStream->read(8192);
-                $buffer .= $chunk;
+            $phpStream = StreamWrapper::getResource($response->getBody());
 
-                var_dump($buffer);
-                
-                while (($newlinePos = strpos($buffer, "\n")) !== false) {
-                    $line = substr($buffer, 0, $newlinePos);
-                    
-                    $buffer = substr($buffer, $newlinePos + 1);
-                    
-                    if (trim($line) !== '') {
-                        $data = json_decode($line, true);
-                        if ($data) {
-                            yield $data;
-                        }
-                    }
+            $posts = Items::fromStream($phpStream, ['pointer' => '/posts']);
+
+            $batchSize = 2; // TODO: Change to 100 - Testing purposes
+            $buffer = [];
+
+            foreach ($posts as $post) {
+                $buffer[] = $post;
+
+                if (count($buffer) >= $batchSize) {
+                    yield $buffer;
+                    $buffer = [];
                 }
             }
-            
-            if (trim($buffer) !== '') {
-                 $data = json_decode($buffer, true);
-                 if ($data) {
-                     yield $data;
-                 }
+            if (!empty($buffer)) {
+                yield $buffer;
             }
         } catch (BadResponseException $e) {
             $response = $e->getResponse();
