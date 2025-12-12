@@ -7,9 +7,6 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\RequestException;
 use Psr\Http\Message\ResponseInterface;
-use Halaxa\JsonMachine\JsonMachine;
-use GuzzleHttp\Psr7\StreamWrapper;
-use JsonMachine\Items;
 
 abstract class TraackrApiObject
 {
@@ -385,27 +382,19 @@ abstract class TraackrApiObject
 
         $logger->debug('Calling (POST-STREAM): ' . $url . ' [' . http_build_query($params) . ']');
         
+        $rawNdjsonBuffer = '';
+
         try {
             $response = $this->client->request('POST', $url, $options);
-            $phpStream = StreamWrapper::getResource($response->getBody());
-
-            $posts = Items::fromStream($phpStream, ['pointer' => '/posts']);
-
-            $batchSize = 2; // TODO: Change to 100 - Testing purposes
-            $buffer = [];
-
-            foreach ($posts as $post) {
-                $buffer[] = $post;
-
-                if (count($buffer) >= $batchSize) {
-                    yield $buffer;
-                    $buffer = [];
-                }
+            
+            $bodyStream = $response->getBody();
+            while (!$bodyStream->eof()) {
+                $rawNdjsonBuffer .= $bodyStream->read(1024); // Read 1KB at a time
             }
-            if (!empty($buffer)) {
-                yield $buffer;
-            }
-        } catch (BadResponseException $e) {
+            
+            $httpcode = $response->getStatusCode();
+
+        } catch (ClientException | ServerException $e) {
             $response = $e->getResponse();
             $httpcode = $response->getStatusCode();
             $errorMessage = $response->getBody()->getContents();
@@ -436,7 +425,7 @@ abstract class TraackrApiObject
         
         // If the API is configured to return raw JSON, return the buffer
         if (TraackrAPI::isJsonOutput()) {
-            return $data;
+            return $rawNdjsonBuffer;
         }
 
         // If not, process the NDJSON buffer with our helper method
