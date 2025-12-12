@@ -453,7 +453,6 @@ class Influencers extends TraackrApiObject
         'enable_country_aggregation' => false,
         'enable_audience_aggregation' => false,
         'enable_uids_aggregation' => false,
-        'batch_size' => 25,
         'sort' => 'name',
         'sort_order' => 'asc'
         )

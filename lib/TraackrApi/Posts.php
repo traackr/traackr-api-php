@@ -141,13 +141,11 @@ class Posts extends TraackrApiObject {
    }
 
    public static function stream($p = array(
-      // Defaults consolidados de lookup y search
       'is_tag_prefix' => false,
       'lang' => 'all',
       'include_entities' => false,
-      'include_keyword_matches' => false, // de search
-      'batch_size' => 25, // 'count' ahora es 'batch_size'
-      'sort' => 'date' // de search
+      'include_keyword_matches' => false,
+      'sort' => 'date'
    )) {
       $posts = new Posts();
       $p = $posts->addCustomerKey($p);

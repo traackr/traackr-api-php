@@ -7,6 +7,8 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\RequestException;
 use Psr\Http\Message\ResponseInterface;
+use JsonMachine\Items;
+use GuzzleHttp\Psr7\StreamWrapper;
 
 abstract class TraackrApiObject
 {
@@ -355,11 +357,11 @@ abstract class TraackrApiObject
     }
 
     /**
-     * Make a POST request to the API with streaming support
+     * Make a POST request to the API and yield items one by one
      * @param string $url The URL to request
      * @param array $params The parameters to pass to the API
-     * @param string $entityKey The key of the entity to process
-     * @return mixed The response from the API
+     * @param string $entityKey The key of the entity list to yield (e.g., 'posts')
+     * @return \Generator Returns a generator that yields each item
      */
     public function postStream($url, $params = [], $entityKey = 'influencers')
     {
@@ -373,28 +375,37 @@ abstract class TraackrApiObject
 
         $options = [
             'form_params' => $params,
-            'stream' => true, 
+            'stream' => true,
             'headers' => array_merge(
                 ['Content-Type' => 'application/x-www-form-urlencoded;charset=utf-8'],
                 TraackrApi::getExtraHeaders()
             )
         ];
 
-        $logger->debug('Calling (POST-STREAM): ' . $url . ' [' . http_build_query($params) . ']');
-        
-        $rawNdjsonBuffer = '';
+        $logger->debug('Calling (STREAM): ' . $url);
 
         try {
             $response = $this->client->request('POST', $url, $options);
-            
-            $bodyStream = $response->getBody();
-            while (!$bodyStream->eof()) {
-                $rawNdjsonBuffer .= $bodyStream->read(1024); // Read 1KB at a time
-            }
-            
-            $httpcode = $response->getStatusCode();
+            $phpStream = StreamWrapper::getResource($response->getBody());
 
-        } catch (ClientException | ServerException $e) {
+            $items = Items::fromStream($phpStream, [
+                'pointer' => '/' . $entityKey
+            ]);
+            $batch = [];
+
+            foreach ($items as $item) {
+                $batch[] = $item;
+
+                if (count($batch) >= 2) {
+                    yield $batch; 
+                    $batch = [];
+                }
+            }
+
+            if (!empty($batch)) {
+                yield $batch;
+            }
+        } catch (BadResponseException $e) {
             $response = $e->getResponse();
             $httpcode = $response->getStatusCode();
             $errorMessage = $response->getBody()->getContents();
@@ -420,16 +431,5 @@ abstract class TraackrApiObject
             $logger->error($message);
             throw new TraackrApiException($message, 0, $e);
         }
-
-        // Process successful response
-        
-        // If the API is configured to return raw JSON, return the buffer
-        if (TraackrAPI::isJsonOutput()) {
-            return $rawNdjsonBuffer;
-        }
-
-        // If not, process the NDJSON buffer with our helper method
-        // Pass the buffer as an argument, we no longer use a class property
-        return $this->processNdjsonBuffer($rawNdjsonBuffer, $entityKey);
     }
 }
