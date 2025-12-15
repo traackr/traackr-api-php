@@ -25,7 +25,7 @@ abstract class TraackrApiObject
     private $base_headers = [
         'Cache-Control' => 'no-cache',
         'Pragma' => 'no-cache',
-        'Expect' => '', // Avoid 417 errors in some proxies, needed?
+        'Expect' => '', // Avoid 417 errors in some proxies
         'Accept-Charset' => 'utf-8',
         'Accept' => '*/*'
     ];
@@ -132,6 +132,11 @@ abstract class TraackrApiObject
      * @param array $options The options to pass to Guzzle
      * @param bool $decode Whether to decode the response
      * @return mixed The response from the API
+     * @throws InvalidCustomerKeyException If the customer key is invalid
+     * @throws MissingParameterException If a required parameter is missing
+     * @throws InvalidApiKeyException If the API key is invalid
+     * @throws NotFoundException If the API resource is not found
+     * @throws TraackrApiException If the API call fails with a generic error
      */
     private function request($method, $url, $options, $decode)
     {
@@ -309,61 +314,16 @@ abstract class TraackrApiObject
     }
 
     /**
-     * Process the NDJSON buffer - helper method for stream requests
-     * @param string $ndjsonBuffer The NDJSON buffer to process
-     * @param string $entityKey The key of the entity to process
-     * @return array The processed response
-     */
-    private function processNdjsonBuffer($ndjsonBuffer, $entityKey = 'influencers')
-    {
-        $mergedResponse = [
-            $entityKey => [],
-            'errors' => [],
-            'count' => 0,
-        ];
-
-        // Split the buffer by line breaks
-        $lines = explode("\n", $ndjsonBuffer);
-
-        foreach ($lines as $line) {
-            if (empty(trim($line))) {
-                continue; // Ignore empty lines
-            }
-
-            $jsonLine = json_decode($line, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $mergedResponse['errors'][] = [
-                    'message' => 'Failed to decode JSON line: ' . json_last_error_msg(),
-                    'line' => $line
-                ];
-                continue;
-            }
-
-            // Assume each line has a structure { "influencers": [...] }
-            if (isset($jsonLine[$entityKey]) && is_array($jsonLine[$entityKey])) {
-                $mergedResponse[$entityKey] = array_merge(
-                    $mergedResponse[$entityKey],
-                    $jsonLine[$entityKey]
-                );
-            }
-            
-            // Add the count if it exists
-            if (isset($jsonLine['count'])) {
-                $mergedResponse['count'] += (int)$jsonLine['count'];
-            }
-        }
-
-        return $mergedResponse;
-    }
-
-    /**
-     * Make a POST request to the API and yield items one by one
+     * Make a POST request to the API and yield items in batches
      * @param string $url The URL to request
      * @param array $params The parameters to pass to the API
      * @param string $entityKey The key of the entity list to yield (e.g., 'posts')
-     * @return \Generator Returns a generator that yields each item
+     * @param int $generatorBatchSize The batch size for the generator. Default is 500.
+     * @return \Generator Returns a generator that yields each batch of items
+     * @throws TraackrApiException If the JSON response is invalid
+     * Other exceptions are thrown and described in the request() method
      */
-    public function postStream($url, $params = [], $entityKey = 'influencers')
+    public function postStream($url, $params = [], $entityKey = 'influencers', $generatorBatchSize = 500)
     {
         $logger = TraackrAPI::getLogger();
         $api_key = TraackrApi::getApiKey();
@@ -387,49 +347,28 @@ abstract class TraackrApiObject
         try {
             $response = $this->client->request('POST', $url, $options);
             $phpStream = StreamWrapper::getResource($response->getBody());
-
+            
             $items = Items::fromStream($phpStream, [
                 'pointer' => '/' . $entityKey
             ]);
             $batch = [];
-
+            
             foreach ($items as $item) {
                 $batch[] = $item;
-
-                if (count($batch) >= 2) {
+                
+                if (count($batch) >= $generatorBatchSize) {
                     yield $batch; 
                     $batch = [];
                 }
             }
-
+            
             if (!empty($batch)) {
                 yield $batch;
             }
-        } catch (BadResponseException $e) {
-            $response = $e->getResponse();
-            $httpcode = $response->getStatusCode();
-            $errorMessage = $response->getBody()->getContents();
-
-            if ($httpcode === 400) {
-                if ($errorMessage === 'Customer key not found') {
-                    throw new InvalidCustomerKeyException('Invalid Customer Key (HTTP 400): ' . $errorMessage, $httpcode, $e);
-                }
-                throw new MissingParameterException('Missing or Invalid argument/parameter (HTTP 400): ' . $errorMessage, $httpcode, $e);
-            }
-            if ($httpcode === 403) {
-                throw new InvalidApiKeyException('Invalid API key (HTTP 403): ' . $errorMessage, $httpcode, $e);
-            }
-            if ($httpcode === 404) {
-                throw new NotFoundException('API resource not found (HTTP 404): ' . $url, $httpcode, $e);
-            }
-            // Generic error
-            throw new TraackrApiException('API HTTP Error (HTTP ' . $httpcode . '): ' . $errorMessage, $httpcode, $e);
-
-        } catch (RequestException $e) {
-            // Handle network errors (timeout, DNS, etc.)
-            $message = 'API stream call failed: ' . $e->getMessage();
-            $logger->error($message);
-            throw new TraackrApiException($message, 0, $e);
+        } catch (InvalidArgumentException $e) {
+            // Handle invalid JSON response
+            $logger->error('Invalid JSON response: ' . $e->getMessage());
+            throw new TraackrApiException('Invalid JSON response: ' . $e->getMessage(), 0, $e);
         }
     }
 }
