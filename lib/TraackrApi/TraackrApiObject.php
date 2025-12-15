@@ -314,16 +314,15 @@ abstract class TraackrApiObject
     }
 
     /**
-     * Make a POST request to the API and yield items in batches
+     * Make a POST request to the API and yield items
      * @param string $url The URL to request
      * @param array $params The parameters to pass to the API
      * @param string $entityKey The key of the entity list to yield (e.g., 'posts')
-     * @param int $generatorBatchSize The batch size for the generator. Default is 500.
      * @return \Generator Returns a generator that yields each batch of items
      * @throws TraackrApiException If the JSON response is invalid
      * Other exceptions are thrown and described in the request() method
      */
-    public function postStream($url, $params = [], $entityKey = 'influencers', $generatorBatchSize = 500)
+    public function postStream($url, $params = [], $entityKey = 'influencers')
     {
         $logger = TraackrAPI::getLogger();
         $api_key = TraackrApi::getApiKey();
@@ -348,23 +347,23 @@ abstract class TraackrApiObject
             $response = $this->client->request('POST', $url, $options);
             $phpStream = StreamWrapper::getResource($response->getBody());
             
+            $pageInfoIterator = Items::fromStream($phpStream, [
+                'pointer' => '/page_info'
+            ]);
+
+            $pageInfo = iterator_to_array($pageInfoIterator)['page_info'] ?? null;
+            
+            // Rewind the stream to the beginning
+            rewind($phpStream);
+
             $items = Items::fromStream($phpStream, [
                 'pointer' => '/' . $entityKey
             ]);
-            $batch = [];
             
-            foreach ($items as $item) {
-                $batch[] = $item;
-                
-                if (count($batch) >= $generatorBatchSize) {
-                    yield $batch; 
-                    $batch = [];
-                }
-            }
-            
-            if (!empty($batch)) {
-                yield $batch;
-            }
+            return [
+                'page_info' => $pageInfo,
+                [$entityKey] => $items
+            ];
         } catch (InvalidArgumentException $e) {
             // Handle invalid JSON response
             $logger->error('Invalid JSON response: ' . $e->getMessage());
