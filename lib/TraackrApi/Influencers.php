@@ -443,6 +443,7 @@ class Influencers extends TraackrApiObject
      * @param array $p
      * @return bool|mixed
      * @throws MissingParameterException
+     * @throws \UnexpectedValueException If the scoring mode is not valid
      */
     public static function stream($p = array(
         'is_tag_prefix' => false,
@@ -454,10 +455,15 @@ class Influencers extends TraackrApiObject
         'enable_audience_aggregation' => false,
         'enable_uids_aggregation' => false,
         'sort' => 'name',
-        'sort_order' => 'asc'
+        'sort_order' => 'asc',
+        'count' => 1_500_000 // default max results
         )
     ) {
         $inf = new Influencers();
+
+        if ($p['scoring_mode'] === 'ENGAGEMENT_RATE_V2') {
+            throw new \UnexpectedValueException('Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.');
+        }
 
         $p['is_tag_prefix'] = $inf->convertBool($p, 'is_tag_prefix');
         $p['enable_tags_aggregation'] = $inf->convertBool($p, 'enable_tags_aggregation');
