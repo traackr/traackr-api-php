@@ -219,7 +219,8 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
      */
     public function testLookupSocialTiktok()
     {
-        $handle = 'mason_fulp';
+        $handle = 'masonfulp';
+        $uid = 'f3dcf5cb81e7369582f5022e4309b594';
 
         $inf = Traackr\Influencers::lookupSocial($handle, 'TIKTOK');
         // Check result is there
@@ -237,24 +238,17 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $this->assertArrayNotHasKey('channels', $inf['influencer'][$handle], 'Channels should not have be returned');
         $this->assertArrayNotHasKey('tags', $inf['influencer'][$handle], 'Tags field missing');
         // Check some values
-        $this->assertEquals('5c6d75287d804a02900102878879b595', $inf['influencer'][$handle]['uid'], 'Incorrect UID');
-        $this->assertEquals('dsada', $inf['influencer'][$handle]['name'], 'Incorrect name');
+        $this->assertEquals($uid, $inf['influencer'][$handle]['uid'], 'Incorrect UID');
+        $this->assertEquals('Mason Fulp', $inf['influencer'][$handle]['name'], 'Incorrect name');
 
         // NOTE
         // Disable customer key so that 'show' does not return tags b/c lookupSocial doesn't currently
         Traackr\TraackrApi::setCustomerKey('');
-        $inf = Traackr\Influencers::show('5c6d75287d804a02900102878879b595');
-        $insta = Traackr\Influencers::lookupSocial('mason_fulp', 'TIKTOK');
+        $inf = Traackr\Influencers::show($uid);
+        $tiktok = Traackr\Influencers::lookupSocial($handle, 'TIKTOK');
         $this->assertJsonStringEqualsJsonString(
-            json_encode($inf['influencer']['5c6d75287d804a02900102878879b595']),
-            json_encode($insta['influencer']['mason_fulp'])
-        );
-
-        // Test based on Insta ID type parameter
-        $insta = Traackr\Influencers::lookupSocial('6532073363051937794', 'TIKTOK', 'USER_ID');
-        $this->assertJsonStringEqualsJsonString(
-            json_encode($inf['influencer']['5c6d75287d804a02900102878879b595']),
-            json_encode($insta['influencer']['6532073363051937794'])
+            json_encode($inf['influencer'][$uid]),
+            json_encode($tiktok['influencer'][$handle])
         );
     }
 
