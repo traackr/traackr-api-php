@@ -456,7 +456,7 @@ class Influencers extends TraackrApiObject
         'enable_uids_aggregation' => false,
         'sort' => 'name',
         'sort_order' => 'asc',
-        'count' => 1_500_000 // default max results
+        'count' => 1500000 // default max results
         )
     ) {
         $inf = new Influencers();

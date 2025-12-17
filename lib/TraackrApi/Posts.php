@@ -146,7 +146,7 @@ class Posts extends TraackrApiObject {
       'include_entities' => false,
       'include_keyword_matches' => false,
       'sort' => 'date',
-      'count' => 1_500_000 // default max results
+      'count' => 1500000 // default max results
    )) {
       $posts = new Posts();
       $p = $posts->addCustomerKey($p);
