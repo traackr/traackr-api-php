@@ -38,6 +38,7 @@ jobs:
       - name: Run tests
         env:
           TRAACKR_API_KEY: ${{ secrets.TRAACKR_DEV_API_KEY }}
+          TRAACKR_CUSTOMER_KEY: ${{ secrets.TRAACKR_DEV_CUSTOMER_KEY }}
         run: ./bin/phpunit --group read-only test
 
   release_draft:
