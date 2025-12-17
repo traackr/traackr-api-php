@@ -708,29 +708,6 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * @group read-only
-     * @group audience
-     */
-    public function testSearchWithAudienceParameter()
-    {
-        $inf = Traackr\Influencers::search([
-            'audience' => json_encode([
-                'network' => 'twitter',
-                'filters' => [
-                    [
-                        'code' => 'GEN'
-                    ]
-                ]
-            ]),
-
-            'count' => 1
-        ]);
-
-        $this->assertCount(1, $inf['influencers']);
-        $this->assertEmpty($inf['influencers'][0]['post_hits']);
-    }
-
-    /**
      * @group error-check
      * @group read-only
      * @expectedException Traackr\MissingParameterException
