@@ -665,12 +665,12 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
 
 
         // Lookup By Email
-        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => array('dchancogne@traackr.com', 'jdorfman@traackr.com')));
+        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => array('dchancogne@traackr.com', 'pierreloic@traackr.com')));
         $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
         $this->assertCount(2, $inf['influencers'], 'Two results should have been found');
 
         // Lookup By Email String
-        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => 'dchancogne@traackr.com,jdorfman@traackr.com'));
+        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => 'dchancogne@traackr.com,pierreloic@traackr.com'));
         $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
         $this->assertCount(2, $inf['influencers'], 'Two results should have been found');
     }
