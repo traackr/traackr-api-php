@@ -341,7 +341,7 @@ abstract class TraackrApiObject
             )
         ];
 
-        $logger->debug('Calling (STREAM): ' . $url);
+        $logger->debug('Calling (STREAM): ' . $url . ' with params: ' . json_encode($params));
 
         try {
             $response = $this->client->request('POST', $url, $options);
