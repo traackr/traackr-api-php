@@ -28,7 +28,13 @@ class Influencers extends TraackrApiObject
         $p = $inf->addCustomerKey($p);
         $inf->checkRequiredParams($p, array('with_channels'));
 
-        return $inf->get(TraackrApi::$apiBaseUrl . 'influencers/show/' . $uid, $p);
+        // Public API uses GET with UID in path, internal APIs use POST with uids param
+        if (strpos(TraackrApi::$apiBaseUrl, 'api.traackr.com') !== false) {
+            return $inf->get(TraackrApi::$apiBaseUrl . 'influencers/show/' . $uid, $p);
+        } else {
+            $p['uids'] = $uid;
+            return $inf->post(TraackrApi::$apiBaseUrl . 'influencers/show/', $p);
+        }
     }
 
     /**
