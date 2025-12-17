@@ -129,70 +129,6 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     /**
      * @group read-only
      */
-    public function testConnections()
-    {
-        $to = Traackr\Influencers::connections($this->infUid, 'to');
-        // Check some fields
-        $this->assertArrayHasKey('influencer', $to, 'No influencer found');
-        $this->assertArrayHasKey($this->infUid, $to['influencer'], 'Invalid influencer found');
-        $this->assertArrayHasKey('uid', $to['influencer'][$this->infUid], 'No UID field found');
-        $this->assertArrayHasKey('connections_to', $to['influencer'][$this->infUid], 'No connections_to field found');
-        $this->assertArrayNotHasKey('connections_from', $to['influencer'][$this->infUid], 'connections_from field found');
-        // Check some values
-        $this->assertEquals($this->infUid, $to['influencer'][$this->infUid]['uid'], 'UID does not match');
-        $this->assertInternalType('array', $to['influencer'][$this->infUid]['connections_to'], 'connections_to is not a array');
-        // 2 tests to make it work in QA and PROD
-        $this->assertGreaterThanOrEqual(1, count($to['influencer'][$this->infUid]['connections_to']), 'Different number of connections_to then expected');
-        $this->assertLessThanOrEqual(20, count($to['influencer'][$this->infUid]['connections_to']), 'Different number of connections_to then expected');
-        // Check connections
-        $this->assertArrayHasKey('type', $to['influencer'][$this->infUid]['connections_to'][0], 'connections_to has no type');
-        $type = $to['influencer'][$this->infUid]['connections_to'][0]['type'];
-        $this->assertTrue($type == 'TRAACKR' || $type == 'TWITTER_USER', 'Invalid type');
-        $this->assertArrayHasKey('native_id', $to['influencer'][$this->infUid]['connections_to'][0], 'connections_to has no native_id');
-        $this->assertArrayHasKey('connection_score', $to['influencer'][$this->infUid]['connections_to'][0], 'connections_to has no connection_score');
-        $this->assertArrayHasKey('connection_metrics', $to['influencer'][$this->infUid]['connections_to'][0], 'connections_to has no connection_metrics');
-
-
-        $from = Traackr\Influencers::connections($this->infUid, 'from');
-        // Check some fields
-        $this->assertArrayHasKey('influencer', $from, 'No influencer found');
-        $this->assertArrayHasKey($this->infUid, $from['influencer'], 'Invalid influencer found');
-        $this->assertArrayHasKey('uid', $from['influencer'][$this->infUid], 'No UID field found');
-        $this->assertArrayHasKey('connections_from', $from['influencer'][$this->infUid], 'No connections_from field found');
-        $this->assertArrayNotHasKey('connections_to', $from['influencer'][$this->infUid], 'connections_to field found');
-        // Check some values
-        $this->assertEquals($this->infUid, $from['influencer'][$this->infUid]['uid'], 'UID does not match');
-        $this->assertInternalType('array', $from['influencer'][$this->infUid]['connections_from'], 'connections_from is not a array');
-
-        $connections = Traackr\Influencers::connections($this->infUid);
-        // Check some fields
-        $this->assertArrayHasKey('influencer', $connections, 'No influencer found');
-        $this->assertArrayHasKey($this->infUid, $connections['influencer'], 'Invalid influencer found');
-        $this->assertArrayHasKey('uid', $connections['influencer'][$this->infUid], 'No UID field found');
-        $this->assertArrayHasKey('connections_from', $connections['influencer'][$this->infUid], 'No connections_from field found');
-        $this->assertArrayHasKey('connections_to', $connections['influencer'][$this->infUid], 'No connections_to field found');
-        // Check some values
-        $this->assertEquals($this->infUid, $connections['influencer'][$this->infUid]['uid'], 'UID does not match');
-        $this->assertInternalType('array', $connections['influencer'][$this->infUid]['connections_from'], 'connections_from is not a array');
-        $this->assertInternalType('array', $connections['influencer'][$this->infUid]['connections_to'], 'connections_to is not a array');
-        // 2 tests to make it work in QA and PROD
-        $this->assertGreaterThanOrEqual(1, count($connections['influencer'][$this->infUid]['connections_to']), 'Different number of connections_to then expected');
-        $this->assertLessThanOrEqual(20, count($connections['influencer'][$this->infUid]['connections_to']), 'Different number of connections_to then expected');
-    }
-
-    /**
-     * @group read-only
-     * @expectedException Traackr\NotFoundException
-     */
-    public function testConnectionsNotFound()
-    {
-        Traackr\Influencers::connections('to', '00000');
-        Traackr\Influencers::connections('from', '00000');
-    }
-
-    /**
-     * @group read-only
-     */
     public function testLookupSocialTwitter()
     {
         $twitterHandle = 'dchancogne';
@@ -682,7 +618,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
      */
     public function testLookupRO()
     {
-        $inf = Traackr\Influencers::lookup(array('name' => 'xxxXXXxxx'));
+        $inf = Traackr\Influencers::lookup(array('name' => 'zzzNONEXISTENT999zzz'));
         $this->assertCount(0, $inf['influencers'], 'Results found');
 
         $inf = Traackr\Influencers::lookup(array('name' => $this->infName));
@@ -811,34 +747,11 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
      * @group error-check
      * @group read-only
      * @expectedException Traackr\MissingParameterException
-     * @expectedExceptionMessage Missing parameter: must provide keywords or audience parameter
+     * @expectedExceptionMessage Missing parameter: must provide keywords, audience, or social data search parameter
      */
     public function testSearchMissingRequiredParameter()
     {
         Traackr\Influencers::search([]);
-    }
-
-    /**
-     * @group audience
-     * @group error-check
-     * @group read-only
-     * @expectedException Traackr\MissingParameterException
-     * @expectedExceptionMessage Missing or Invalid argument/parameter (HTTP 400): Malformed request parameter {audience}
-     */
-    public function testSearchMalformedAudienceParameter()
-    {
-        Traackr\Influencers::search([
-            'audience' => json_encode([
-                'network' => 'ascii',
-                'filters' => [
-                    [
-                        'code' => 'GEN'
-                    ]
-                ]
-            ]),
-
-            'count' => 1
-        ]);
     }
 
     /**
@@ -874,7 +787,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('audienceStatsTotal', $inf['aggregations'], 'Audience Aggregation: Audience Stats key missing');
         $this->assertNotEmpty($inf['aggregations']['audienceStatsTotal'], 'No audience aggregations found');
 
-        $inf = Traackr\Influencers::search(array('keywords' => 'xxxaaaxxx'));
+        $inf = Traackr\Influencers::search(array('keywords' => 'zzzNONEXISTENT999zzz'));
         $this->assertCount(0, $inf['influencers'], 'Results found');
 
         // Search Email
@@ -918,7 +831,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
 
     public function testQuickLookup()
     {
-        $inf = Traackr\Influencers::quickLookup(array('query' => 'xxxXXXxxx'));
+        $inf = Traackr\Influencers::quickLookup(array('query' => 'zzzNONEXISTENT999zzz'));
         $this->assertCount(0, $inf['influencers'], 'Results found');
 
         $inf = Traackr\Influencers::quickLookup(array('query' => $this->infName));

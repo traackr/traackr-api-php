@@ -33,26 +33,6 @@ class Influencers extends TraackrApiObject
     }
 
     /**
-     * Returns an influencer's connections
-     *
-     * @param string $uid
-     * @param string $direction
-     * @return bool|mixed
-     * @throws MissingParameterException
-     */
-    public static function connections($uid, $direction = '')
-    {
-        if (empty($uid)) {
-            throw new MissingParameterException("Missing Influencer UID parameter");
-        }
-
-        $uid = is_array($uid) ? implode(',', $uid) : $uid;
-        $direction = empty($direction) ? '' : $direction . '/';
-        $inf = new Influencers();
-        return $inf->get(TraackrApi::$apiBaseUrl . 'influencers/connections/' . $direction . $uid, []);
-    }
-
-    /**
      * Lookup Influencer by a social handle
      *
      * @param string $username
