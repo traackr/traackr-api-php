@@ -345,8 +345,25 @@ abstract class TraackrApiObject
 
         try {
             $response = $this->client->request('POST', $url, $options);
-            $phpStream = StreamWrapper::getResource($response->getBody());
+            $body = $response->getBody();
+
+            // When there is not results, the api returns an empty body. We return a default page info.
+            if ($body->getSize() === 0) {
+                return [
+                    'page_info' => [
+                        "current_page": 0,
+                        "has_more" => false,
+                        "next_page" => 0,
+                        "page_count" => 0,
+                        "results_count" => 0,
+                        "total_results_count" => 0,
+                        "total_results_count_capped" => false
+                    },
+                    $entityKey => [] 
+                ];
+            }
             
+            $phpStream = StreamWrapper::getResource($body);
             $pageInfoIterator = Items::fromStream($phpStream, [
                 'pointer' => '/page_info'
             ]);
