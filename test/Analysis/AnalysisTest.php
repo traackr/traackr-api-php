@@ -19,6 +19,11 @@ class AnalysisTest extends PHPUnit_Framework_TestCase {
     * @group read-only
     */
     public function testKeywords() {
+        // Skip test when running against public API (endpoint not available)
+        if (strpos(Traackr\TraackrApi::$apiBaseUrl, 'api.traackr.com') !== false) {
+            $this->markTestSkipped('analysis/keywords endpoint not available on public API');
+        }
+
         $json = array('keywords' => array(
             array('label' => 'default',
             'context' => 'POST',
