@@ -345,10 +345,10 @@ abstract class TraackrApiObject
 
         try {
             $response = $this->client->request('POST', $url, $options);
-            $body = $response->getBody();
+            $phpStream = StreamWrapper::getResource($response->getBody());
 
             // When there is not results, the api returns an empty body. We return a default page info.
-            if ($body->getSize() === 0) {
+            if (if (fgetc($phpStream) === false)) {
                 return [
                     'page_info' => [
                         'current_page' => 0,
@@ -362,8 +362,8 @@ abstract class TraackrApiObject
                     $entityKey => []
                 ];
             }
-            
-            $phpStream = StreamWrapper::getResource($body);
+
+            rewind($phpStream);
             $pageInfoIterator = Items::fromStream($phpStream, [
                 'pointer' => '/page_info'
             ]);
