@@ -351,15 +351,15 @@ abstract class TraackrApiObject
             if ($body->getSize() === 0) {
                 return [
                     'page_info' => [
-                        "current_page": 0,
-                        "has_more" => false,
-                        "next_page" => 0,
-                        "page_count" => 0,
-                        "results_count" => 0,
-                        "total_results_count" => 0,
-                        "total_results_count_capped" => false
+                        'current_page' => 0,
+                        'has_more' => false,
+                        'next_page' => 0,
+                        'page_count' => 0,
+                        'results_count' => 0,
+                        'total_results_count' => 0,
+                        'total_results_count_capped' => false
                     ],
-                    $entityKey => [] 
+                    $entityKey => []
                 ];
             }
             
