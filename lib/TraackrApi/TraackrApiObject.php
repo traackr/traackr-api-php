@@ -348,7 +348,7 @@ abstract class TraackrApiObject
             $phpStream = StreamWrapper::getResource($response->getBody());
 
             // When there is not results, the api returns an empty body. We return a default page info.
-            if (if (fgetc($phpStream) === false)) {
+            if (fgetc($phpStream) === false) {
                 return [
                     'page_info' => [
                         'current_page' => 0,
