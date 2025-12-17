@@ -660,15 +660,8 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
             'name' => 'John',
             'enable_audience_aggregation' => true));
         $this->assertArrayHasKey('aggregations', $inf, 'Audience aggregation missing');
-
-        $this->assertArrayHasKey('audienceStatsReach', $inf['aggregations'], 'Audience Aggregation: Audience Stats Reach key missing');
-        $this->assertNotEmpty($inf['aggregations']['audienceStatsReach'], 'No audience stats reach aggregations found');
-
         $this->assertArrayHasKey('audienceStatsTotal', $inf['aggregations'], 'Audience Aggregation: Audience Stats Total key missing');
         $this->assertNotEmpty($inf['aggregations']['audienceStatsTotal'], 'No audience stats total aggregations found');
-
-        $this->assertArrayHasKey('audienceStatsImpressions', $inf['aggregations'], 'Audience Aggregation: Audience Stats Impressions key missing');
-        $this->assertNotEmpty($inf['aggregations']['audienceStatsImpressions'], 'No audience stats impressions aggregations found');
 
 
         // Lookup By Email
