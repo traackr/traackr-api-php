@@ -358,7 +358,7 @@ abstract class TraackrApiObject
                         "results_count" => 0,
                         "total_results_count" => 0,
                         "total_results_count_capped" => false
-                    },
+                    ],
                     $entityKey => [] 
                 ];
             }
