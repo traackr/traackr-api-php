@@ -755,13 +755,13 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $this->assertCount(0, $inf['influencers'], 'Results found');
 
         // Search Email
-        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => array('dchancogne@traackr.com')));
-        $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
+        $inf = Traackr\Influencers::search(array('keywords' => 'fun', 'emails' => array('dchancogne@traackr.com')));
+        $this->assertGreaterThan(0, count($inf['influencers']), 'No results found');
         $this->assertEquals('David Chancogne', $inf['influencers'][0]['name'], 'Name does not match expected result by email address: dchancogne@traackr.com');
 
         // Search Email (Emails param is string, not array)
-        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => 'dchancogne@traackr.com'));
-        $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
+        $inf = Traackr\Influencers::search(array('keywords' => 'fun', 'emails' => 'dchancogne@traackr.com'));
+        $this->assertGreaterThan(0, count($inf['influencers']), 'No results found');
         $this->assertEquals('David Chancogne', $inf['influencers'][0]['name'], 'Name does not match expected result by email address: dchancogne@traackr.com');
     }
 
