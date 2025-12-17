@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         # PHPUnit 4.8 is not compatible with PHP 8.x (each() removed)
-        php-version: ['7.4']
+        php-version: ['5.5', '7.4']
 
     steps:
       - uses: actions/checkout@v4
