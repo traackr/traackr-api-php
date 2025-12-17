@@ -343,12 +343,23 @@ abstract class TraackrApiObject
 
         $logger->debug('Calling (STREAM): ' . $url . ' with params: ' . json_encode($params));
 
+
+        $tempStream = null;
         try {
             $response = $this->client->request('POST', $url, $options);
-            $phpStream = StreamWrapper::getResource($response->getBody());
 
-            // When there is not results, the api returns an empty body. We return a default page info.
-            if (fgetc($phpStream) === false) {
+            $tempStream = fopen('php://temp', 'r+');
+
+            $originalStream = StreamWrapper::getResource($response->getBody());
+            stream_copy_to_stream($originalStream, $tempStream);
+
+            rewind($tempStream);
+
+            $stats = fstat($tempStream);
+            
+            if ($stats['size'] === 0) {
+                fclose($tempStream);
+                
                 return [
                     'page_info' => [
                         'current_page' => 0,
@@ -363,28 +374,38 @@ abstract class TraackrApiObject
                 ];
             }
 
-            rewind($phpStream);
-            $pageInfoIterator = Items::fromStream($phpStream, [
+            $pageInfoIterator = Items::fromStream($tempStream, [
                 'pointer' => '/page_info'
             ]);
 
-            $pageInfo = iterator_to_array($pageInfoIterator)['page_info'] ?? null;
+            $pageInfo = iterator_to_array($pageInfoIterator);
             
-            // Rewind the stream to the beginning
-            rewind($phpStream);
+            rewind($tempStream);
 
-            $items = Items::fromStream($phpStream, [
+            $items = Items::fromStream($tempStream, [
                 'pointer' => '/' . $entityKey
             ]);
-            
+
+            echo json_encode($pageInfo);
+
             return [
                 'page_info' => $pageInfo,
-                [$entityKey] => $items
+                $entityKey => $items
             ];
+
         } catch (InvalidArgumentException $e) {
-            // Handle invalid JSON response
+            if (is_resource($tempStream)) {
+                fclose($tempStream);
+            }
+
             $logger->error('Invalid JSON response: ' . $e->getMessage());
             throw new TraackrApiException('Invalid JSON response: ' . $e->getMessage(), 0, $e);
+            
+        } catch (\Exception $e) {
+            if (is_resource($tempStream)) {
+                fclose($tempStream);
+            }
+            throw $e;
         }
     }
 }
