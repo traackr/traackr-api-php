@@ -220,7 +220,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     public function testLookupSocialTiktok()
     {
         $handle = 'masonfulp';
-        $uid = 'f3dcf5cb81e7369582f5022e4309b594';
+        $uid = 'fab5dd3e749d46099a54461406dad7a1';
 
         $inf = Traackr\Influencers::lookupSocial($handle, 'TIKTOK');
         // Check result is there
@@ -659,13 +659,13 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
 
 
         // Lookup By Email
-        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => array('dchancogne@traackr.com', 'pierreloic@traackr.com')));
-        $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
+        $inf = Traackr\Influencers::search(array('keywords' => 'fun', 'emails' => array('dchancogne@traackr.com', 'pierreloic@traackr.com')));
+        $this->assertGreaterThan(0, count($inf['influencers']), 'No results found');
         $this->assertCount(2, $inf['influencers'], 'Two results should have been found');
 
         // Lookup By Email String
-        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'emails' => 'dchancogne@traackr.com,pierreloic@traackr.com'));
-        $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
+        $inf = Traackr\Influencers::search(array('keywords' => 'fun', 'emails' => 'dchancogne@traackr.com,pierreloic@traackr.com'));
+        $this->assertGreaterThan(0, count($inf['influencers']), 'No results found');
         $this->assertCount(2, $inf['influencers'], 'Two results should have been found');
     }
 
