@@ -8,7 +8,7 @@ use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\RequestException;
 use Psr\Http\Message\ResponseInterface;
 use JsonMachine\Items;
-use GuzzleHttp\Psr7\StreamWrapper;
+use GuzzleHttp\Psr7\CachingStream;
 
 abstract class TraackrApiObject
 {
@@ -346,23 +346,27 @@ abstract class TraackrApiObject
 
         $tempStream = null;
         try {
-            $response = $this->client->request('POST', $url, $options);
-            $phpStream = StreamWrapper::getResource($response->getBody());
-            
-            $pageInfoIterator = Items::fromStream($phpStream, [
+            $response = $this->client->request('POST', $url, array_merge($options, [
+                'stream' => true 
+            ]));
+
+            $stream = new CachingStream($response->getBody());
+
+            $pageInfoIterator = Items::fromStream($stream, [
                 'pointer' => '/page_info'
             ]);
-            $pageInfo = iterator_to_array($pageInfoIterator)['page_info'] ?? null;
-            
-            // Rewind the stream to the beginning
-            rewind($phpStream);
-            $items = Items::fromStream($phpStream, [
+
+            $pageInfo = iterator_to_array($pageInfoIterator)['page_info'];
+
+            $stream->rewind();
+
+            $items = Items::fromStream($stream, [
                 'pointer' => '/' . $entityKey
             ]);
-            
+
             return [
                 'page_info' => $pageInfo,
-                [$entityKey] => $items
+                $entityKey => $items
             ];
         } catch (InvalidArgumentException $e) {
             if (is_resource($tempStream)) {
