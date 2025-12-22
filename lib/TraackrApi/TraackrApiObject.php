@@ -347,52 +347,23 @@ abstract class TraackrApiObject
         $tempStream = null;
         try {
             $response = $this->client->request('POST', $url, $options);
-
-            $tempStream = fopen('php://temp', 'r+');
-
-            $originalStream = StreamWrapper::getResource($response->getBody());
-            stream_copy_to_stream($originalStream, $tempStream);
-
-            rewind($tempStream);
-
-            $stats = fstat($tempStream);
+            $phpStream = StreamWrapper::getResource($response->getBody());
             
-            if ($stats['size'] === 0) {
-                fclose($tempStream);
-                
-                return [
-                    'page_info' => [
-                        'current_page' => 0,
-                        'has_more' => false,
-                        'next_page' => 0,
-                        'page_count' => 0,
-                        'results_count' => 0,
-                        'total_results_count' => 0,
-                        'total_results_count_capped' => false
-                    ],
-                    $entityKey => []
-                ];
-            }
-
-            $pageInfoIterator = Items::fromStream($tempStream, [
+            $pageInfoIterator = Items::fromStream($phpStream, [
                 'pointer' => '/page_info'
             ]);
-
-            $pageInfo = iterator_to_array($pageInfoIterator);
+            $pageInfo = iterator_to_array($pageInfoIterator)['page_info'] ?? null;
             
-            rewind($tempStream);
-
-            $items = Items::fromStream($tempStream, [
+            // Rewind the stream to the beginning
+            rewind($phpStream);
+            $items = Items::fromStream($phpStream, [
                 'pointer' => '/' . $entityKey
             ]);
-
-            echo json_encode($pageInfo);
-
+            
             return [
                 'page_info' => $pageInfo,
-                $entityKey => $items
+                [$entityKey] => $items
             ];
-
         } catch (InvalidArgumentException $e) {
             if (is_resource($tempStream)) {
                 fclose($tempStream);
