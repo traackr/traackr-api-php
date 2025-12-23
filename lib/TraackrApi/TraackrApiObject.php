@@ -8,7 +8,9 @@ use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\RequestException;
 use Psr\Http\Message\ResponseInterface;
 use JsonMachine\Items;
+use JsonMachine\JsonDecoder\ExtJsonDecoder;
 use GuzzleHttp\Psr7\CachingStream;
+use GuzzleHttp\Psr7\StreamWrapper;
 
 abstract class TraackrApiObject
 {
@@ -341,27 +343,35 @@ abstract class TraackrApiObject
             )
         ];
 
-        $logger->debug('Calling (STREAM): ' . $url . ' with params: ' . json_encode($params));
+        $fullUrl = $url . '?' . http_build_query($params);
+        $logger->debug('Calling (STREAM): ' . $fullUrl);
 
-
-        $tempStream = null;
         try {
             $response = $this->client->request('POST', $url, array_merge($options, [
                 'stream' => true 
             ]));
 
-            $stream = new CachingStream($response->getBody());
+            $psr7Stream = new CachingStream($response->getBody());
+            $stream = StreamWrapper::getResource($psr7Stream);
 
-            $pageInfoIterator = Items::fromStream($stream, [
-                'pointer' => '/page_info'
+            rewind($stream);
+            $pageInfo = []; 
+
+            $rootIterator = Items::fromStream($stream, [
+                'decoder' => new ExtJsonDecoder(true) 
             ]);
 
-            $pageInfo = iterator_to_array($pageInfoIterator)['page_info'];
+            foreach ($rootIterator as $key => $value) {
+                if ($key === 'page_info') {
+                    $pageInfo = (array) $value; 
+                    break; 
+                }
+            }
 
-            $stream->rewind();
-
+            rewind($stream);
             $items = Items::fromStream($stream, [
-                'pointer' => '/' . $entityKey
+                'pointer' => '/' . $entityKey,
+                'decoder' => new ExtJsonDecoder(true)
             ]);
 
             return [
@@ -369,18 +379,13 @@ abstract class TraackrApiObject
                 $entityKey => $items
             ];
         } catch (InvalidArgumentException $e) {
-            if (is_resource($tempStream)) {
-                fclose($tempStream);
-            }
-
-            $logger->error('Invalid JSON response: ' . $e->getMessage());
-            throw new TraackrApiException('Invalid JSON response: ' . $e->getMessage(), 0, $e);
-            
+            $message = 'Invalid JSON response: ' . $e->getMessage();
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
         } catch (\Exception $e) {
-            if (is_resource($tempStream)) {
-                fclose($tempStream);
-            }
-            throw $e;
+            $message = 'API stream call failed: ' . $e->getMessage();
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
         }
     }
 }
