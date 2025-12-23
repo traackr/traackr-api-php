@@ -351,16 +351,16 @@ abstract class TraackrApiObject
                 'stream' => true 
             ]));
 
+            // Wrap the response body in a caching stream, to allow rewinding
             $psr7Stream = new CachingStream($response->getBody());
             $stream = StreamWrapper::getResource($psr7Stream);
 
-            rewind($stream);
             $pageInfo = []; 
 
             $rootIterator = Items::fromStream($stream, [
                 'decoder' => new ExtJsonDecoder(true) 
             ]);
-
+            // Get the page info
             foreach ($rootIterator as $key => $value) {
                 if ($key === 'page_info') {
                     $pageInfo = (array) $value; 
@@ -368,6 +368,7 @@ abstract class TraackrApiObject
                 }
             }
 
+            // Rewind the stream to the beginning, to get the items
             rewind($stream);
             $items = Items::fromStream($stream, [
                 'pointer' => '/' . $entityKey,

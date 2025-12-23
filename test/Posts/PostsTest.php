@@ -61,4 +61,57 @@ class PostsTest extends PHPUnit_Framework_TestCase {
 
    } // End function testSearch()
 
+   /**
+    * Test the stream method
+    * @group read-only
+    */
+    public function testStream() {
+      $params = array(
+         'keywords' => array('traackr', 'marketing'),
+         'sort' => 'date',
+         'count' => 10
+      );
+
+      $result = Traackr\Posts::stream($params);
+
+      $this->assertInternalType('array', $result, 'The return method should be an array');
+      $this->assertArrayHasKey('page_info', $result, 'page_info is missing');
+      $this->assertArrayHasKey('posts', $result, 'The "posts" key is missing');
+
+      $postsGenerator = $result['posts'];
+      $this->assertTrue(
+          is_array($postsGenerator) || $postsGenerator instanceof Traversable, 
+          'The value of the "posts" key should be iterable (Generator)'
+      );
+
+      $found = false;
+      foreach ($postsGenerator as $post) {
+         $found = true;
+         $this->assertArrayHasKey('influencer_uid', $post, 'The post does not have influencer_uid');
+         $this->assertArrayHasKey('url', $post, 'The post does not have url');
+         
+         break; 
+      }
+      
+   }
+
+   /**
+    * Test stream with influencers
+    * @group read-only
+    */
+   public function testStreamWithInfluencers() {
+      $params = array(
+         'influencers' => array($this->infUid),
+         'count' => 5
+      );
+
+      $result = Traackr\Posts::stream($params);
+
+      $this->assertArrayHasKey('posts', $result);
+      
+      foreach ($result['posts'] as $post) {
+         $this->assertEquals($this->infUid, $post['influencer_uid'], 'The post UID does not match');
+         break;
+      }
+   }
 } // End class PostsTest

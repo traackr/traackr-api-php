@@ -832,4 +832,68 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         // this will fail and throw an expected exception
         Traackr\Influencers::quickLookup([]);
     }
+
+    /**
+     * Test stream
+     * @group read-only
+     */
+    public function testStream()
+    {
+        $params = array(
+            'sort' => 'rank',
+            'count' => 1,
+            'name' => 'zzzNONEXISTENT999zzz'
+        );
+
+        $result = Traackr\Influencers::stream($params);
+
+        $this->assertInternalType('array', $result);
+        $this->assertArrayHasKey('page_info', $result);
+        $this->assertArrayHasKey('influencers', $result);
+
+        $infGenerator = $result['influencers'];
+        $this->assertTrue(
+            is_array($infGenerator) || $infGenerator instanceof Traversable,
+            'The value of the "influencers" key should be iterable'
+        );
+
+        foreach ($infGenerator as $influencer) {
+            $this->assertArrayHasKey('uid', $influencer);
+            $this->assertArrayHasKey('name', $influencer);
+            break;
+        }
+    }
+
+    /**
+     * Test stream with array parameters
+     * @group read-only
+     */
+    public function testStreamWithArrayParams()
+    {
+        $params = array(
+            'keywords' => array('marketing', 'social'),
+            'influencers' => array($this->infUid),
+            'count' => 5
+        );
+
+        $result = Traackr\Influencers::stream($params);
+        
+        $this->assertArrayHasKey('influencers', $result, 'The "influencers" key is missing');
+
+        foreach ($result['influencers'] as $influencer) {
+            $this->assertEquals($this->infUid, $influencer['uid'], 'The influencer UID does not match');
+            break;
+        }
+    }
+
+    /**
+     * @expectedException \UnexpectedValueException
+     * @expectedExceptionMessage Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.
+     */
+    public function testStreamWithInvalidScoringMode()
+    {
+        Traackr\Influencers::stream(array(
+            'scoring_mode' => 'ENGAGEMENT_RATE_V2'
+        ));
+    }
 }
