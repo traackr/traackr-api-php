@@ -1,0 +1,87 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test PHP ${{ matrix.php-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # PHPUnit 4.8 is not compatible with PHP 8.x (each() removed)
+        php-version: ['5.5', '7.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: curl, json, mbstring
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Run tests
+        env:
+          TRAACKR_API_KEY: ${{ secrets.TRAACKR_DEV_API_KEY }}
+          TRAACKR_CUSTOMER_KEY: ${{ secrets.TRAACKR_DEV_CUSTOMER_KEY }}
+        run: ./bin/phpunit --group read-only test
+
+  release_draft:
+    name: Create Draft Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest version
+        id: version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          echo "latest=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+          # Parse semver and increment minor version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_TAG"
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT_VERSION="${MAJOR}.${NEXT_MINOR}.0"
+          echo "next=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest: $LATEST_TAG, Next: $NEXT_VERSION"
+
+      - name: Remove existing draft releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' | while read -r tag; do
+            echo "Deleting draft release: $tag"
+            gh release delete "$tag" --yes || true
+          done
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.next }}"
+          gh release create "${VERSION}" \
+            --draft \
+            --title "${VERSION}" \
+            --generate-notes

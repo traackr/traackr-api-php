@@ -24,32 +24,17 @@ class Influencers extends TraackrApiObject
         $p['with_channels'] = $inf->convertBool($p, 'with_channels');
         // support for multi params
         $uid = is_array($uid) ? implode(',', $uid) : $uid;
-        $p['uids'] = $uid;
         // Add customer key + check required params
         $p = $inf->addCustomerKey($p);
         $inf->checkRequiredParams($p, array('with_channels'));
 
-        return $inf->post(TraackrApi::$apiBaseUrl . 'influencers/show/', $p);
-    }
-
-    /**
-     * Returns an influencer's connections
-     *
-     * @param string $uid
-     * @param string $direction
-     * @return bool|mixed
-     * @throws MissingParameterException
-     */
-    public static function connections($uid, $direction = '')
-    {
-        if (empty($uid)) {
-            throw new MissingParameterException("Missing Influencer UID parameter");
+        // Public API uses GET with UID in path, internal APIs use POST with uids param
+        if (strpos(TraackrApi::$apiBaseUrl, 'api.traackr.com') !== false) {
+            return $inf->get(TraackrApi::$apiBaseUrl . 'influencers/show/' . $uid, $p);
+        } else {
+            $p['uids'] = $uid;
+            return $inf->post(TraackrApi::$apiBaseUrl . 'influencers/show/', $p);
         }
-
-        $uid = is_array($uid) ? implode(',', $uid) : $uid;
-        $direction = empty($direction) ? '' : $direction . '/';
-        $inf = new Influencers();
-        return $inf->get(TraackrApi::$apiBaseUrl . 'influencers/connections/' . $direction . $uid, []);
     }
 
     /**
