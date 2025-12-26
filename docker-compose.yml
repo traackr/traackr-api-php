@@ -1,0 +1,12 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    tty: true
+    volumes:
+      - .:/var/traackr-api-php
+    working_dir: /var/traackr-api-php
+    environment:
+      - TRAACKR_API_KEY=1233
+      - TRAACKR_CUSTOMER_KEY=2ba9a4e5115f4b93
