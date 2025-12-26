@@ -423,6 +423,67 @@ class Influencers extends TraackrApiObject
     }
 
     /**
+     * Stream influencers.
+     *
+     * @param array $p
+     * @return bool|mixed
+     * @throws MissingParameterException
+     * @throws \UnexpectedValueException If the scoring mode is not valid
+     */
+    public static function stream($p = array(
+        'is_tag_prefix' => false,
+        'gender' => 'all',
+        'type' => 'person',
+        'lang' => 'all',
+        'enable_tags_aggregation' => false,
+        'enable_country_aggregation' => false,
+        'enable_audience_aggregation' => false,
+        'enable_uids_aggregation' => false,
+        'sort' => 'name',
+        'sort_order' => 'asc',
+        'count' => 1500000 // default max results
+        )
+    ) {
+        $inf = new Influencers();
+
+        if ($p['scoring_mode'] === 'ENGAGEMENT_RATE_V2') {
+            throw new \UnexpectedValueException('Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.');
+        }
+
+        $p['is_tag_prefix'] = $inf->convertBool($p, 'is_tag_prefix');
+        $p['enable_tags_aggregation'] = $inf->convertBool($p, 'enable_tags_aggregation');
+        $p['enable_country_aggregation'] = $inf->convertBool($p, 'enable_country_aggregation');
+        $p['enable_audience_aggregation'] = $inf->convertBool($p, 'enable_audience_aggregation');
+        $p['enable_uids_aggregation'] = $inf->convertBool($p, 'enable_uids_aggregation');
+        $p['use_alternate_vit'] = $inf->convertBool($p, 'use_alternate_vit');
+
+        $p = $inf->addCustomerKey($p);
+
+        $multiParams = [
+            'influencers', 'influencers_exclusive', 'tags', 'tags_exclusive', 'emails',
+            'keywords', 'exclusion_keywords', 'root_urls_inclusive', 'root_urls_exclusive',
+            'publication_types_inclusive', 'publication_types_exclusive', 
+            'posts_inclusive', 'posts_exclusive'
+        ];
+
+        foreach ($multiParams as $param) {
+            if (isset($p[$param]) && is_array($p[$param])) {
+                $p[$param] = implode(',', $p[$param]);
+            }
+        }
+
+        if (isset($p['enable_regional_country_exclusions'])) {
+            $p['enable_regional_country_exclusions'] = $inf->convertBool($p, 'enable_regional_country_exclusions');
+        }
+
+        return $inf->postStream(
+            TraackrApi::$apiBaseUrl . 'influencers/stream', 
+            $p, 
+            'influencers'
+        );
+    }
+
+    /**
      * Quick search for influencers
      *
      * @param array $p

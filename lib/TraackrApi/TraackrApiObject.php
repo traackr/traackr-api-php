@@ -2,59 +2,61 @@
 
 namespace Traackr;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Exception\RequestException;
+use Psr\Http\Message\ResponseInterface;
+use JsonMachine\Items;
+use JsonMachine\JsonDecoder\ExtJsonDecoder;
+use GuzzleHttp\Psr7\CachingStream;
+use GuzzleHttp\Psr7\StreamWrapper;
+
 abstract class TraackrApiObject
 {
     public static $connectionTimeout = 10;
     public static $timeout = 10;
     public static $sslVerifyPeer = true;
 
-    private $curl;
+    /**
+     * @var Client Guzzle client instance
+     */
+    private $client;
 
-    // Headers passed with each request
-    private $curl_headers = [
-        // Adding some headers to force no caching.
-        'Cache-Control: no-cache',
-        'Pragma: no-cache',
-
-        //some proxies throw a "417" error for CURL calls; CURL is supposed
-        //to retry the call, but doesn't, so just set "Expect" to nothing to
-        //avoid this (this ensures that CURL doesn't set it to an unrecognized
-        //value under the covers)
-        'Expect:',
-
-        // To Ensure the server sends back UTF-8 text
-        'Accept-Charset: utf-8',
-        'Accept: */*'
+    // Headers base passed with each request
+    private $base_headers = [
+        'Cache-Control' => 'no-cache',
+        'Pragma' => 'no-cache',
+        'Expect' => '', // Avoid 417 errors in some proxies
+        'Accept-Charset' => 'utf-8',
+        'Accept' => '*/*'
     ];
 
     public function __construct()
     {
-        // init cURL
-        $this->curl = curl_init();
+        // Base configuration for the Guzzle client
+        $config = [
+            'connect_timeout' => self::$connectionTimeout,
+            'timeout' => self::$timeout,
+            'verify' => self::$sslVerifyPeer,
+            'headers' => $this->base_headers,
+            'http_errors' => true, // Guzzle will throw exceptions on 4xx and 5xx errors
+        ];
+
+        // Initialize Guzzle Client
+        $this->client = new Client($config);
     }
 
     /**
-     * Initialize self::$curl with the base settings all request types use.
-     */
-    private function initCurlOpts()
-    {
-        // clear any existing opts
-        curl_reset($this->curl);
-        // return value as a string
-        curl_setopt($this->curl, CURLOPT_RETURNTRANSFER, true);
-        // Set timeouts
-        curl_setopt($this->curl, CURLOPT_CONNECTTIMEOUT, self::$connectionTimeout);
-        curl_setopt($this->curl, CURLOPT_TIMEOUT, self::$timeout);
-        // Set encodings
-        curl_setopt($this->curl, CURLOPT_ENCODING, 'gzip;q=1.0, deflate;q=0.5, identity;q=0.1');
-        // SSL verify peer
-        curl_setopt($this->curl, CURLOPT_SSL_VERIFYPEER, self::$sslVerifyPeer);
-    }
-
+    * Check if required parameters are present
+    * @param array $params The parameters to check
+    * @param array $fields The fields to check
+    * @throws MissingParameterException If a required parameter is missing
+    */
     protected function checkRequiredParams($params, $fields)
     {
         foreach ($fields as $f) {
-            // empty(false) returns true so need extra test for that
+            // empty(false) returns true so an extra test is needed for that
             if (empty($params[$f]) && !(isset($params[$f]) && is_bool($params[$f]))) {
                 throw new MissingParameterException('Missing parameter: ' . $f);
             }
@@ -62,8 +64,9 @@ abstract class TraackrApiObject
     }
 
     /**
-     * influencers/lookup & /search and posts/lookup and /search now support multiple
-     * customer-keys, so this function massages arrays of them.
+     * Add customer key to parameters
+     * @param array &$params The parameters to add the customer key to
+     * @return array The parameters with the customer key added
      */
     protected function addCustomerKey(&$params)
     {
@@ -79,14 +82,14 @@ abstract class TraackrApiObject
         return $params;
     }
 
-    /*
-     * Make best attempt at converting booleans.
-     * Boolean type should be passed to the API but this function will also
-     * handle their string representation ('true' and 'false')
+    /**
+     * Convert boolean to string
+     * @param array $params The parameters to convert the boolean to a string
+     * @param string $key The key of the parameter to convert
+     * @return string The boolean as a string
      */
     protected function convertBool($params, $key)
     {
-        // Does key even exists?
         if (!isset($params[$key])) {
             return 'false';
         }
@@ -104,9 +107,11 @@ abstract class TraackrApiObject
         return 'false';
     }
 
-    // Prepare parameters before any GET or POST call.
-    // For now any pass-thru parameter passed as a true or false boolean
-    // is converted to a string since that's what the API expects
+    /**
+     * Prepare parameters
+     * @param array $params The parameters to prepare
+     * @return array The prepared parameters
+     */
     private function prepareParameters($params)
     {
         foreach ($params as $key => $value) {
@@ -122,192 +127,266 @@ abstract class TraackrApiObject
         return $params;
     }
 
-    private function call($decode, $contentTypeHeader)
+    /**
+     * Make a request to the API
+     * @param string $method The HTTP method to use
+     * @param string $url The URL to request
+     * @param array $options The options to pass to Guzzle
+     * @param bool $decode Whether to decode the response
+     * @return mixed The response from the API
+     * @throws InvalidCustomerKeyException If the customer key is invalid
+     * @throws MissingParameterException If a required parameter is missing
+     * @throws InvalidApiKeyException If the API key is invalid
+     * @throws NotFoundException If the API resource is not found
+     * @throws TraackrApiException If the API call fails with a generic error
+     */
+    private function request($method, $url, $options, $decode)
     {
-        // Prep headers
-        curl_setopt(
-            $this->curl,
-            CURLOPT_HTTPHEADER,
-            array_merge($this->curl_headers, [$contentTypeHeader], TraackrApi::getExtraHeaders())
-        );
-
-        // Make the call!
-        $curl_exec = curl_exec($this->curl);
-
         $logger = TraackrAPI::getLogger();
+        $logger->debug("Calling ({$method}): {$url}", $options);
 
-        if ($curl_exec === false) {
-            $info = curl_getinfo($this->curl);
-            $message = 'API call failed (' . $info['url'] . '): ' . curl_error($this->curl);
+        try {
+            $response = $this->client->request($method, $url, $options);
+            $body = $response->getBody()->getContents();
 
-            $logger->error($message);
-
-            throw new TraackrApiException($message);
-        }
-
-        if (null === $curl_exec) {
-            $message = 'API call failed. Response was null.';
-
-            $logger->error($message);
-
-            throw new TraackrApiException($message);
-        }
-
-        $httpcode = (int)curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
-
-        if (!($httpcode >= 200 && $httpcode <= 299)) {
-            $info = curl_getinfo($this->curl);
+        } catch (ClientException $e) {
+            // Handle 4xx errors
+            $response = $e->getResponse();
+            $httpcode = $response->getStatusCode();
+            $body = $response->getBody()->getContents();
 
             if ($httpcode === 400) {
-                // Let's try to see if it's a bad customer key
-                if ($curl_exec === 'Customer key not found') {
+                if ($body === 'Customer key not found') {
                     $message = 'Invalid Customer Key (HTTP 400)';
-
                     $logger->error($message);
-
-                    throw new InvalidCustomerKeyException(
-                        $message . ': ' . $curl_exec,
-                        $httpcode
-                    );
+                    throw new InvalidCustomerKeyException($message . ': ' . $body, $httpcode, $e);
                 }
-
                 $message = 'Missing or Invalid argument/parameter (HTTP 400)';
-
                 $logger->error($message);
-
-                throw new MissingParameterException(
-                    $message . ': ' . $curl_exec,
-                    $httpcode
-                );
+                throw new MissingParameterException($message . ': ' . $body, $httpcode, $e);
             }
 
             if ($httpcode === 403) {
                 $message = 'Invalid API key (HTTP 403)';
                 $logger->error($message);
-
-                throw new InvalidApiKeyException(
-                    $message . ': ' . $curl_exec,
-                    $httpcode
-                );
+                throw new InvalidApiKeyException($message . ': ' . $body, $httpcode, $e);
             }
 
             if ($httpcode === 404) {
                 $message = 'API resource not found (HTTP 404)';
-
                 $logger->error($message);
-
-                throw new NotFoundException(
-                    $message . ': ' . $info['url'],
-                    $httpcode
-                );
+                throw new NotFoundException($message . ': ' . $url, $httpcode, $e);
             }
 
+            // Other 4xx error
+            $message = 'API HTTP Error (HTTP ' . $httpcode . ')';
+            $logger->error($message);
+            throw new TraackrApiException($message . ': ' . $body, $httpcode, $e);
+
+        } catch (ServerException $e) {
+            // Handle 5xx errors
+            $response = $e->getResponse();
+            $httpcode = $response->getStatusCode();
+            $body = $response->getBody()->getContents();
             $message = 'API HTTP Error (HTTP ' . $httpcode . ')';
 
             $logger->error($message);
+            throw new TraackrApiException($message . ': ' . $body, $httpcode, $e);
 
-            throw new TraackrApiException(
-                $message . ': ' . $curl_exec,
-                $httpcode
-            );
+        } catch (RequestException $e) {
+            // Handle network errors (timeout, DNS, etc.)
+            $message = 'API call failed: ' . $e->getMessage();
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
         }
 
-        // API MUST return UTF8
+        // Success
+
+        if (empty($body)) { // The body can be an empty string, not null
+             $logger->debug('API call successful with empty response body.');
+             return false;
+        }
+
+        // API must return UTF8
         if ($decode) {
-            $rez = json_decode($curl_exec, true);
+            $rez = json_decode($body, true);
+            // Check JSON error
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                 $message = 'Failed to decode JSON response: ' . json_last_error_msg();
+                 $logger->error($message);
+                 throw new TraackrApiException($message . ': ' . $body);
+            }
         } else {
-            $rez = $curl_exec;
+            $rez = $body;
         }
 
         return null === $rez ? false : $rez;
     }
 
+    /**
+     * Make a GET request to the API
+     * @param string $url The URL to request
+     * @param array $params The parameters to pass to the API
+     * @return mixed The response from the API
+     */
     public function get($url, $params = [])
     {
-        $this->initCurlOpts();
-        // Add API key parameter if not present
         $api_key = TraackrApi::getApiKey();
         if (!isset($params[PARAM_API_KEY]) && !empty($api_key)) {
             $params[PARAM_API_KEY] = $api_key;
         }
 
-        // Add params if needed
+        // Prepare parameters (bools to strings)
         if (!empty($params)) {
-            // Prepare params
             $params = $this->prepareParameters($params);
-            $url .= '?' . http_build_query($params);
         }
 
-        // Sets URL
-        curl_setopt($this->curl, CURLOPT_URL, $url);
-        // Make call
-        $logger = TraackrAPI::getLogger();
-        $logger->debug('Calling (GET): ' . $url);
+        // Guzzle options for GET
+        $options = [
+            'query' => $params,
+            'headers' => array_merge(
+                ['Content-Type' => 'application/json;charset=utf-8'],
+                TraackrApi::getExtraHeaders()
+            )
+        ];
 
-        return $this->call(!TraackrAPI::isJsonOutput(), 'Content-Type: application/json;charset=utf-8');
+        return $this->request('GET', $url, $options, !TraackrAPI::isJsonOutput());
     }
 
+    /**
+     * Make a POST request to the API
+     * @param string $url The URL to request
+     * @param array $params The parameters to pass to the API
+     * @param bool $isJson Whether to send the parameters as JSON
+     * @return mixed The response from the API
+     */
     public function post($url, $params = [], $isJson = false)
     {
-        $this->initCurlOpts();
-        // POST call
-        curl_setopt($this->curl, CURLOPT_POST, 1);
-
-        // Build Parameters
-        // Add API key parameter if not present; API key always passed as a query
-        // string even for POST
         $api_key = TraackrApi::getApiKey();
         if (!empty($api_key)) {
             $url .= '?' . PARAM_API_KEY . '=' . $api_key;
         }
 
-        // Sets URL
-        curl_setopt($this->curl, CURLOPT_URL, $url);
+        $options = [];
 
         if (!$isJson) {
-            // Prepare params
+            // application/x-www-form-urlencoded
             $params = $this->prepareParameters($params);
-            // Sets params
-            $http_param_query = http_build_query($params);
+            $options['form_params'] = $params; 
+            $contentType = 'application/x-www-form-urlencoded;charset=utf-8';
         } else {
-            $http_param_query = json_encode($params);
+            // application/json
+            $options['json'] = $params;
+            $contentType = 'application/json;charset=utf-8';
         }
-        curl_setopt($this->curl, CURLOPT_POSTFIELDS, $http_param_query);
 
-        // Make call
-        $logger = TraackrAPI::getLogger();
-        $logger->debug('Calling (POST): ' . $url . ' [' . $http_param_query . ']');
+        // Add headers
+        $options['headers'] = array_merge(
+            ['Content-Type' => $contentType],
+            TraackrApi::getExtraHeaders()
+        );
 
-        return $this->call(!TraackrAPI::isJsonOutput(), $isJson ? 'Content-Type: application/json;charset=utf-8' : 'Content-Type: application/x-www-form-urlencoded;charset=utf-8');
+        return $this->request('POST', $url, $options, !TraackrAPI::isJsonOutput());
     }
 
-    // Support for HTTP DELETE Methods
+    /**
+     * Make a DELETE request to the API
+     * @param string $url The URL to request
+     * @param array $params The parameters to pass to the API
+     * @return mixed The response from the API
+     */
     public function delete($url, $params = [])
     {
-        $this->initCurlOpts();
-        // Build Parameters
-        // Add API key parameter if not present; API key always passed as a query
-        // string even for DELETE
         $api_key = TraackrApi::getApiKey();
         if (!empty($api_key)) {
             $url .= '?' . PARAM_API_KEY . '=' . $api_key;
         }
 
-        // Sets URL
-        curl_setopt($this->curl, CURLOPT_URL, $url);
-
-        // Prepare and set params
         $params = $this->prepareParameters($params);
-        $http_param_query = http_build_query($params);
-        curl_setopt($this->curl, CURLOPT_POSTFIELDS, $http_param_query);
-        // Sets URL
-        curl_setopt($this->curl, CURLOPT_URL, $url);
-        // Set Custom Request for DELETE
-        curl_setopt($this->curl, CURLOPT_CUSTOMREQUEST, 'DELETE');
-        // Make call
-        $logger = TraackrAPI::getLogger();
-        $logger->debug('Calling (DELETE): ' . $url);
 
-        return $this->call(false, 'Content-Type: application/x-www-form-urlencoded;charset=utf-8');
+        $options = [
+            'form_params' => $params,
+            'headers' => array_merge(
+                ['Content-Type' => 'application/x-www-form-urlencoded;charset=utf-8'],
+                TraackrApi::getExtraHeaders()
+            )
+        ];
+
+        return $this->request('DELETE', $url, $options, false);
+    }
+
+    /**
+     * Make a POST request to the API and yield items
+     * @param string $url The URL to request
+     * @param array $params The parameters to pass to the API
+     * @param string $entityKey The key of the entity list to yield (e.g., 'posts')
+     * @return \Generator Returns a generator that yields each batch of items
+     * @throws TraackrApiException If the JSON response is invalid
+     * Other exceptions are thrown and described in the request() method
+     */
+    public function postStream($url, $params = [], $entityKey = 'influencers')
+    {
+        $logger = TraackrAPI::getLogger();
+        $api_key = TraackrApi::getApiKey();
+        if (!empty($api_key)) {
+            $url .= '?' . PARAM_API_KEY . '=' . $api_key;
+        }
+
+        $params = $this->prepareParameters($params);
+
+        $options = [
+            'form_params' => $params,
+            'stream' => true,
+            'headers' => array_merge(
+                ['Content-Type' => 'application/x-www-form-urlencoded;charset=utf-8'],
+                TraackrApi::getExtraHeaders()
+            )
+        ];
+
+        $fullUrl = $url . '?' . http_build_query($params);
+        $logger->debug('Calling (STREAM): ' . $fullUrl);
+
+        try {
+            $response = $this->client->request('POST', $url, array_merge($options, [
+                'stream' => true 
+            ]));
+
+            // Wrap the response body in a caching stream, to allow rewinding
+            $psr7Stream = new CachingStream($response->getBody());
+            $stream = StreamWrapper::getResource($psr7Stream);
+
+            $pageInfo = []; 
+
+            $rootIterator = Items::fromStream($stream, [
+                'decoder' => new ExtJsonDecoder(true) 
+            ]);
+            // Get the page info
+            foreach ($rootIterator as $key => $value) {
+                if ($key === 'page_info') {
+                    $pageInfo = (array) $value; 
+                    break; 
+                }
+            }
+
+            // Rewind the stream to the beginning, to get the items
+            rewind($stream);
+            $items = Items::fromStream($stream, [
+                'pointer' => '/' . $entityKey,
+                'decoder' => new ExtJsonDecoder(true)
+            ]);
+
+            return [
+                'page_info' => $pageInfo,
+                $entityKey => $items
+            ];
+        } catch (InvalidArgumentException $e) {
+            $message = 'Invalid JSON response: ' . $e->getMessage();
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
+        } catch (\Exception $e) {
+            $message = 'API stream call failed: ' . $e->getMessage();
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
+        }
     }
 }

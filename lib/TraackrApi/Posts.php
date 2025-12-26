@@ -139,4 +139,58 @@ class Posts extends TraackrApiObject {
       return $posts->post(TraackrApi::$apiBaseUrl.'posts/search', $p);
 
    }
+
+   public static function stream($p = array(
+      'is_tag_prefix' => false,
+      'lang' => 'all',
+      'include_entities' => false,
+      'include_keyword_matches' => false,
+      'sort' => 'date',
+      'count' => 1500000 // default max results
+   )) {
+      $posts = new Posts();
+      $p = $posts->addCustomerKey($p);
+
+      // Sanitize boolean parameters
+      $p['is_tag_prefix'] = $posts->convertBool($p, 'is_tag_prefix');
+      $p['include_entities'] = $posts->convertBool($p, 'include_entities');
+      $p['include_brand_content'] = $posts->convertBool($p, 'include_brand_content');
+      $p['include_shared_content'] = $posts->convertBool($p, 'include_shared_content');
+      $p['use_alternate_vit'] = $posts->convertBool($p, 'use_alternate_vit');
+      $p['include_keyword_matches'] = $posts->convertBool($p, 'include_keyword_matches'); // (de search)
+
+      // Convert arrays parameters
+      // Consolidated list of all parameters that can be arrays
+      $multiParams = [
+         'influencers',
+         'tags',
+         'tags_exclusive',
+         'root_urls_inclusive',
+         'root_urls_exclusive',
+         'publication_types_inclusive',
+         'publication_types_exclusive',
+         'posts_inclusive',
+         'posts_exclusive',
+         'keywords',
+         'exclusion_keywords'
+      ];
+
+      foreach ($multiParams as $param) {
+         if (isset($p[$param]) && is_array($p[$param])) {
+            $p[$param] = implode(',', $p[$param]);
+         }
+      }
+      
+      // Final boolean parameter
+      if (isset($p['enable_regional_country_exclusions'])) {
+         $p['enable_regional_country_exclusions'] = $posts->convertBool($p, 'enable_regional_country_exclusions');
+      }
+
+      // Call the streaming endpoint
+      return $posts->postStream(
+         TraackrApi::$apiBaseUrl . 'posts/stream',
+         $p,
+         'posts'
+      );
+   }
 }
