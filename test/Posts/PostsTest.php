@@ -114,4 +114,15 @@ class PostsTest extends PHPUnit_Framework_TestCase {
          break;
       }
    }
+
+   public function testStreamWithInvalidCustomerKey() {
+      Traackr\TraackrApi::setCustomerKey('invalid');
+
+      $this->expectException(Traackr\TraackrApiException::class);
+      $this->expectExceptionMessage('Invalid customer key');
+
+      Traackr\Posts::stream(array('count' => 5));
+
+      Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
+   }
 } // End class PostsTest

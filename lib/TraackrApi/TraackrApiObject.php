@@ -140,13 +140,17 @@ abstract class TraackrApiObject
      * @throws NotFoundException If the API resource is not found
      * @throws TraackrApiException If the API call fails with a generic error
      */
-    private function request($method, $url, $options, $decode)
+    private function request($method, $url, $options, $decode, $isStream = false)
     {
         $logger = TraackrAPI::getLogger();
         $logger->debug("Calling ({$method}): {$url}", $options);
 
         try {
             $response = $this->client->request($method, $url, $options);
+            // If the request is a stream, return the response object, otherwise get the body
+            if ($isStream) {
+                return $response;
+            }
             $body = $response->getBody()->getContents();
 
         } catch (ClientException $e) {
@@ -347,9 +351,9 @@ abstract class TraackrApiObject
         $logger->debug('Calling (STREAM): ' . $fullUrl);
 
         try {
-            $response = $this->client->request('POST', $url, array_merge($options, [
+            $response = $this->request('POST', $url, array_merge($options, [
                 'stream' => true 
-            ]));
+            ]), false, true);
 
             // Wrap the response body in a caching stream, to allow rewinding
             $psr7Stream = new CachingStream($response->getBody());

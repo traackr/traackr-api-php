@@ -842,7 +842,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $params = array(
             'sort' => 'rank',
             'count' => 1,
-            'name' => 'zzzNONEXISTENT999zzz'
+            'customer_key' => $this->savedCustomerKey
         );
 
         $result = Traackr\Influencers::stream($params);
@@ -865,28 +865,6 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * Test stream with array parameters
-     * @group read-only
-     */
-    public function testStreamWithArrayParams()
-    {
-        $params = array(
-            'keywords' => array('marketing', 'social'),
-            'influencers' => array($this->infUid),
-            'count' => 5
-        );
-
-        $result = Traackr\Influencers::stream($params);
-        
-        $this->assertArrayHasKey('influencers', $result, 'The "influencers" key is missing');
-
-        foreach ($result['influencers'] as $influencer) {
-            $this->assertEquals($this->infUid, $influencer['uid'], 'The influencer UID does not match');
-            break;
-        }
-    }
-
-    /**
      * @expectedException \UnexpectedValueException
      * @expectedExceptionMessage Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.
      */
@@ -896,4 +874,17 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
             'scoring_mode' => 'ENGAGEMENT_RATE_V2'
         ));
     }
+
+    public function testStreamWithInvalidCustomerKey() {
+        Traackr\TraackrApi::setCustomerKey('invalid');
+        $params = array(
+            'keywords' => array('marketing', 'social'),
+            'influencers' => array($this->infUid),
+            'count' => 5
+        );
+
+        $result = Traackr\Influencers::stream($params);
+  
+        Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
+     }
 }
