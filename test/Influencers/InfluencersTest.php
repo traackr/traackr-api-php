@@ -870,9 +870,9 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
      */
     public function testStreamWithInvalidScoringMode()
     {
-        Traackr\Influencers::stream(array(
+        Traackr\Influencers::stream([
             'scoring_mode' => 'ENGAGEMENT_RATE_V2'
-        ));
+        ]);
     }
 
     public function testStreamWithInvalidCustomerKey() {
