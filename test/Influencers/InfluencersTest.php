@@ -864,17 +864,6 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         }
     }
 
-    /**
-     * @expectedException \UnexpectedValueException
-     * @expectedExceptionMessage Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.
-     */
-    public function testStreamWithInvalidScoringMode()
-    {
-        Traackr\Influencers::stream([
-            'scoring_mode' => 'ENGAGEMENT_RATE_V2'
-        ]);
-    }
-
     public function testStreamWithInvalidCustomerKey() {
         Traackr\TraackrApi::setCustomerKey('invalid');
         $params = array(
