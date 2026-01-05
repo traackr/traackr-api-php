@@ -446,7 +446,7 @@ class Influencers extends TraackrApiObject
     ) {
         $inf = new Influencers();
 
-        if ($p['scoring_mode'] === 'ENGAGEMENT_RATE_V2') {
+        if (isset($p['scoring_mode']) && $p['scoring_mode'] === 'ENGAGEMENT_RATE_V2') {
             throw new \UnexpectedValueException('Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.');
         }
 
