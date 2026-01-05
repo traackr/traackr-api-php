@@ -7,6 +7,8 @@ class Analysis extends TraackrApiObject {
     public static function keywords($p = array())
     {
         $analysis = new Analysis();
-        return $analysis->post(TraackrApi::$apiBaseUrl.'analysis/keywords', $p, true);
+
+        // Note: The third parameter 'true' indicates that the request is a JSON body.
+        return $analysis->post(TraackrApi::$apiBaseUrl . 'analysis/keywords', $p, true);
     }
 }

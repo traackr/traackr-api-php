@@ -832,4 +832,64 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         // this will fail and throw an expected exception
         Traackr\Influencers::quickLookup([]);
     }
+
+    /**
+     * Test stream
+     * @group read-only
+     */
+    public function testStream()
+    {
+        // Skip test when running against public API (endpoint not available)
+        if (strpos(Traackr\TraackrApi::$apiBaseUrl, 'api.traackr.com') !== false) {
+            $this->markTestSkipped('influencers/stream endpoint not available on public API');
+        }
+
+        $params = array(
+            'sort' => 'rank',
+            'count' => 1,
+            'customer_key' => $this->savedCustomerKey
+        );
+
+        $result = Traackr\Influencers::stream($params);
+
+        $this->assertInternalType('array', $result);
+        $this->assertArrayHasKey('page_info', $result);
+        $this->assertArrayHasKey('influencers', $result);
+
+        $infGenerator = $result['influencers'];
+        $this->assertTrue(
+            is_array($infGenerator) || $infGenerator instanceof Traversable,
+            'The value of the "influencers" key should be iterable'
+        );
+
+        foreach ($infGenerator as $influencer) {
+            $this->assertArrayHasKey('uid', $influencer);
+            $this->assertArrayHasKey('name', $influencer);
+            break;
+        }
+    }
+
+    /**
+     * @expectedException \UnexpectedValueException
+     * @expectedExceptionMessage Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.
+     */
+    public function testStreamWithInvalidScoringMode()
+    {
+        Traackr\Influencers::stream([
+            'scoring_mode' => 'ENGAGEMENT_RATE_V2'
+        ]);
+    }
+
+    public function testStreamWithInvalidCustomerKey() {
+        Traackr\TraackrApi::setCustomerKey('invalid');
+        $params = array(
+            'keywords' => array('marketing', 'social'),
+            'influencers' => array($this->infUid),
+            'count' => 5
+        );
+
+        $result = Traackr\Influencers::stream($params);
+  
+        Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
+     }
 }
