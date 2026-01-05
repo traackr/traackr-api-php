@@ -839,6 +839,11 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
      */
     public function testStream()
     {
+        // Skip test when running against public API (endpoint not available)
+        if (strpos(Traackr\TraackrApi::$apiBaseUrl, 'api.traackr.com') !== false) {
+            $this->markTestSkipped('influencers/stream endpoint not available on public API');
+        }
+
         $params = array(
             'sort' => 'rank',
             'count' => 1,
