@@ -324,7 +324,7 @@ abstract class TraackrApiObject
      * @throws TraackrApiException If the JSON response is invalid
      * Other exceptions are thrown and described in the request() method
      */
-    public function postStream($url, $params = [], $entityKey = 'influencers')
+    public function postStream($url, $params = [], $entityKey = 'influencers', $onlyMetadata = false)
     {
         $logger = TraackrAPI::getLogger();
         $api_key = TraackrApi::getApiKey();
@@ -379,6 +379,21 @@ abstract class TraackrApiObject
 
             $pageInfo = $firstPage['page_info'] ?? [];
             $aggregations = $firstPage['aggregations'] ?? [];
+
+            if ($onlyMetadata) {
+                // Explicitly close the stream.
+                // This tells the server (and Guzzle) to stop sending data.
+                // Saves RAM, CPU and network by ignoring the other N pages.
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+
+                return [
+                    'page_info' => $pageInfo,
+                    'aggregations' => $aggregations,
+                    $entityKey => [] // Empty iterable array, no generator
+                ];
+            }
 
             $itemsGenerator = (function() use ($jsonSplitter, $firstPage, $entityKey) {
                 // Yield the items from the first page
