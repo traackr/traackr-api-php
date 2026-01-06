@@ -6,10 +6,6 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\RequestException;
-use Psr\Http\Message\ResponseInterface;
-use JsonMachine\Items;
-use JsonMachine\JsonDecoder\ExtJsonDecoder;
-use GuzzleHttp\Psr7\CachingStream;
 use GuzzleHttp\Psr7\StreamWrapper;
 
 abstract class TraackrApiObject
@@ -351,37 +347,69 @@ abstract class TraackrApiObject
         $logger->debug('Calling (STREAM): ' . $fullUrl);
 
         try {
-            $response = $this->request('POST', $url, array_merge($options, [
+            // 1. Request with real stream
+            $response = $this->client->request('POST', $url, array_merge($options, [
                 'stream' => true 
-            ]), false, true);
+            ]));
+            
+            // Convert to native resource directly
+            $stream = StreamWrapper::getResource($response->getBody());
 
-            // Wrap the response body in a caching stream, to allow rewinding
-            $psr7Stream = new CachingStream($response->getBody());
-            $stream = StreamWrapper::getResource($psr7Stream);
+            // 2. Start our manual Splitter
+            $jsonSplitter = $this->streamJsonObjects($stream);
 
-            $pageInfo = []; 
-
-            $rootIterator = Items::fromStream($stream, [
-                'decoder' => new ExtJsonDecoder(true) 
-            ]);
-            // Get the page info
-            foreach ($rootIterator as $key => $value) {
-                if ($key === 'page_info') {
-                    $pageInfo = (array) $value; 
-                    break; 
-                }
+            // 3. Get the FIRST page immediately
+            // This is necessary to fill 'page_info' before returning.
+            $firstPage = $jsonSplitter->current();
+            
+            if (!$firstPage) {
+                 // Error handling if the first page is empty
+                return [
+                    'page_info' => [
+                        'has_more' => false,
+                        'current_page' => 0,
+                        'next_page' => null,
+                        'page_count' => 1,
+                        'results_count' => 0,
+                        'total_results_count' => 0
+                    ],
+                    $entityKey => []
+                ];
             }
 
-            // Rewind the stream to the beginning, to get the items
-            rewind($stream);
-            $items = Items::fromStream($stream, [
-                'pointer' => '/' . $entityKey,
-                'decoder' => new ExtJsonDecoder(true)
-            ]);
+            $pageInfo = $firstPage['page_info'] ?? [];
+            $aggregations = $firstPage['aggregations'] ?? [];
+
+            $itemsGenerator = (function() use ($jsonSplitter, $firstPage, $entityKey) {
+                // Yield the items from the first page
+                $firstItems = $firstPage[$entityKey] ?? ($firstPage['posts'] ?? []);
+                if (is_array($firstItems)) {
+                    foreach ($firstItems as $item) {
+                        yield $item;
+                    }
+                }
+
+                // Advance the splitter to search for the next pages
+                $jsonSplitter->next();
+
+                // Loop for the rest of the stream (pages 2, 3, 4...)
+                while ($jsonSplitter->valid()) {
+                    $page = $jsonSplitter->current();
+                    $items = $page[$entityKey] ?? ($page['posts'] ?? []);
+                    
+                    if (is_array($items)) {
+                        foreach ($items as $item) {
+                            yield $item;
+                        }
+                    }
+                    $jsonSplitter->next();
+                }
+            })();
 
             return [
                 'page_info' => $pageInfo,
-                $entityKey => $items
+                'aggregations' => $aggregations,
+                $entityKey => $itemsGenerator
             ];
         } catch (InvalidArgumentException $e) {
             $message = 'Invalid JSON response: ' . $e->getMessage();
@@ -391,6 +419,58 @@ abstract class TraackrApiObject
             $message = 'API stream call failed: ' . $e->getMessage();
             $logger->error($message);
             throw new TraackrApiException($message, 0, $e);
+        }
+    }
+
+    /**
+     * Read a stream with multiple concatenated JSON objects and return a Generator.
+     * Each yield is a complete decoded page (array).
+     */
+    private function streamJsonObjects($stream) {
+        $buffer = '';
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+        
+        // Read in chunks of 8KB for efficiency
+        while (!feof($stream)) {
+            $chunk = fread($stream, 8192);
+            if ($chunk === false || $chunk === '') break;
+            
+            $len = strlen($chunk);
+            for ($i = 0; $i < $len; $i++) {
+                $char = $chunk[$i];
+                $buffer .= $char;
+                
+                // Logic to ignore {} inside strings "..."
+                if ($escaped) {
+                    $escaped = false;
+                    continue;
+                }
+                if ($char === '\\') {
+                    $escaped = true;
+                    continue;
+                }
+                if ($char === '"') {
+                    $inString = !$inString;
+                    continue;
+                }
+                
+                // If we are not inside a string, count the keys
+                if (!$inString) {
+                    if ($char === '{') $depth++;
+                    if ($char === '}') $depth--;
+                    
+                    // If the depth goes back to 0, we have a complete JSON object
+                    if ($depth === 0 && trim($buffer) !== '') {
+                        $decoded = json_decode($buffer, true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            yield $decoded;
+                        }
+                        $buffer = ''; // Clean up for the next object
+                    }
+                }
+            }
         }
     }
 }
