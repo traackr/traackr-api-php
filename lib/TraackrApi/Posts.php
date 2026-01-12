@@ -146,7 +146,8 @@ class Posts extends TraackrApiObject {
       'include_entities' => false,
       'include_keyword_matches' => false,
       'sort' => 'date',
-      'count' => 1500000 // default max results
+      'count' => 1500000, // default max results
+      'only_metadata' => false
    )) {
       $posts = new Posts();
       $p = $posts->addCustomerKey($p);
@@ -186,11 +187,16 @@ class Posts extends TraackrApiObject {
          $p['enable_regional_country_exclusions'] = $posts->convertBool($p, 'enable_regional_country_exclusions');
       }
 
+      // Only metadata parameter
+      $onlyMetadata = $p['only_metadata'] ?? false;
+      unset($p['only_metadata']);
+
       // Call the streaming endpoint
       return $posts->postStream(
          TraackrApi::$apiBaseUrl . 'posts/stream',
          $p,
-         'posts'
+         'posts',
+         $onlyMetadata
       );
    }
 }
