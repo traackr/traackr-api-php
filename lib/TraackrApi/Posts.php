@@ -20,6 +20,7 @@ class Posts extends TraackrApiObject {
       $p['include_brand_content'] = $posts->convertBool($p, 'include_brand_content');
       $p['include_shared_content'] = $posts->convertBool($p, 'include_shared_content');
       $p['use_alternate_vit'] = $posts->convertBool($p, 'use_alternate_vit');
+      $p['use_primary_location'] = $posts->convertBool($p, 'use_primary_location');
 
       // support for multi params
       if ( isset($p['influencers']) ) {
@@ -87,6 +88,7 @@ class Posts extends TraackrApiObject {
       $p['include_brand_content'] = $posts->convertBool($p, 'include_brand_content');
       $p['include_shared_content'] = $posts->convertBool($p, 'include_shared_content');
       $p['use_alternate_vit'] = $posts->convertBool($p, 'use_alternate_vit');
+      $p['use_primary_location'] = $posts->convertBool($p, 'use_primary_location');
 
       // support for multi params
       $p['keywords'] = is_array($p['keywords']) ?
@@ -158,6 +160,7 @@ class Posts extends TraackrApiObject {
       $p['include_brand_content'] = $posts->convertBool($p, 'include_brand_content');
       $p['include_shared_content'] = $posts->convertBool($p, 'include_shared_content');
       $p['use_alternate_vit'] = $posts->convertBool($p, 'use_alternate_vit');
+      $p['use_primary_location'] = $posts->convertBool($p, 'use_primary_location');
       $p['include_keyword_matches'] = $posts->convertBool($p, 'include_keyword_matches'); // (de search)
 
       // Convert arrays parameters

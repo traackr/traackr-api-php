@@ -657,6 +657,10 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('audienceStatsTotal', $inf['aggregations'], 'Audience Aggregation: Audience Stats Total key missing');
         $this->assertNotEmpty($inf['aggregations']['audienceStatsTotal'], 'No audience stats total aggregations found');
 
+        // With use_primary_location
+        $inf = Traackr\Influencers::lookup(array('name' => $this->infName, 'use_primary_location' => true));
+        $this->assertArrayHasKey('influencers', $inf, 'No influencers info');
+        $this->assertCount(1, $inf['influencers'], 'Unexpected results');
 
         // Lookup By Email
         $inf = Traackr\Influencers::search(array('keywords' => 'fun', 'emails' => array('dchancogne@traackr.com', 'pierreloic@traackr.com')));
@@ -750,6 +754,11 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('aggregations', $inf, 'Audience aggregation missing');
         $this->assertArrayHasKey('audienceStatsTotal', $inf['aggregations'], 'Audience Aggregation: Audience Stats key missing');
         $this->assertNotEmpty($inf['aggregations']['audienceStatsTotal'], 'No audience aggregations found');
+
+        // With use_primary_location
+        $inf = Traackr\Influencers::search(array('keywords' => 'traackr', 'use_primary_location' => true));
+        $this->assertArrayHasKey('influencers', $inf, 'No influencers info');
+        $this->assertGreaterThan(0, $inf['influencers'], 'No results found');
 
         $inf = Traackr\Influencers::search(array('keywords' => 'zzzNONEXISTENT999zzz'));
         $this->assertCount(0, $inf['influencers'], 'Results found');
@@ -847,7 +856,8 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $params = array(
             'sort' => 'rank',
             'count' => 1,
-            'customer_key' => $this->savedCustomerKey
+            'customer_key' => $this->savedCustomerKey,
+            'use_primary_location' => true
         );
 
         $result = Traackr\Influencers::stream($params);
