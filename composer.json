@@ -24,7 +24,10 @@
     "phpunit/phpunit": "4.8.*"
   },
   "config": {
-    "bin-dir": "bin"
+    "bin-dir": "bin",
+    "audit": {
+      "ignore": ["PKSA-z3gr-8qht-p93v", "PKSA-w57n-mhp6-c9sd"]
+    }
   },
   "autoload": {
     "files": [ "lib/TraackrApi.php"]
