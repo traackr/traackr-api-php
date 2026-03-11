@@ -277,6 +277,7 @@ class Influencers extends TraackrApiObject
         $p['enable_audience_aggregation'] = $inf->convertBool($p, 'enable_audience_aggregation');
         $p['enable_uids_aggregation'] = $inf->convertBool($p, 'enable_uids_aggregation');
         $p['use_alternate_vit'] = $inf->convertBool($p, 'use_alternate_vit');
+        $p['use_primary_location'] = $inf->convertBool($p, 'use_primary_location');
 
         $p = $inf->addCustomerKey($p);
 
@@ -333,6 +334,7 @@ class Influencers extends TraackrApiObject
         $p['enable_country_aggregation'] = $inf->convertBool($p, 'enable_country_aggregation');
         $p['enable_uids_aggregation'] = $inf->convertBool($p, 'enable_uids_aggregation');
         $p['use_alternate_vit'] = $inf->convertBool($p, 'use_alternate_vit');
+        $p['use_primary_location'] = $inf->convertBool($p, 'use_primary_location');
 
 
         $p = $inf->addCustomerKey($p);
@@ -456,6 +458,7 @@ class Influencers extends TraackrApiObject
         $p['enable_audience_aggregation'] = $inf->convertBool($p, 'enable_audience_aggregation');
         $p['enable_uids_aggregation'] = $inf->convertBool($p, 'enable_uids_aggregation');
         $p['use_alternate_vit'] = $inf->convertBool($p, 'use_alternate_vit');
+        $p['use_primary_location'] = $inf->convertBool($p, 'use_primary_location');
 
         $p = $inf->addCustomerKey($p);
 
