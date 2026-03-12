@@ -20,8 +20,9 @@ class Influencers extends TraackrApiObject
 
         // API Object
         $inf = new Influencers();
-        //Sanitize default values
+        // Sanitize default values
         $p['with_channels'] = $inf->convertBool($p, 'with_channels');
+        $p['use_primary_location'] = $inf->convertBool($p, 'use_primary_location');
         // support for multi params
         $uid = is_array($uid) ? implode(',', $uid) : $uid;
         // Add customer key + check required params
