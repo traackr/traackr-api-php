@@ -506,6 +506,7 @@ class Influencers extends TraackrApiObject
         $inf->checkRequiredParams($p, ['query']);
 
         // Sanitize default values
+        $p['use_primary_location'] = $inf->convertBool($p, 'use_primary_location');
         if (isset($p['debug'])) {
             $p['debug'] = $inf->convertBool($p, 'debug');
         }
