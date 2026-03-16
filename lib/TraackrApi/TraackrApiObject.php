@@ -139,7 +139,21 @@ abstract class TraackrApiObject
     private function request($method, $url, $options, $decode, $isStream = false)
     {
         $logger = TraackrAPI::getLogger();
-        $logger->debug("Calling ({$method}): {$url}", $options);
+        // Build full URL with all params as query string for debugging
+        $queryParams = [];
+        if (!empty($options['query'])) {
+            $queryParams = $options['query'];
+        } elseif (!empty($options['form_params'])) {
+            $queryParams = $options['form_params'];
+        } elseif (!empty($options['json'])) {
+            $queryParams = $options['json'];
+        }
+        $fullUrl = $url;
+        if (!empty($queryParams)) {
+            $separator = (strpos($url, '?') !== false) ? '&' : '?';
+            $fullUrl .= $separator . http_build_query($queryParams);
+        }
+        $logger->debug("Calling ({$method}): {$fullUrl}");
 
         try {
             $response = $this->client->request($method, $url, $options);
@@ -343,7 +357,8 @@ abstract class TraackrApiObject
             )
         ];
 
-        $fullUrl = $url . '?' . http_build_query($params);
+        $separator = (strpos($url, '?') !== false) ? '&' : '?';
+        $fullUrl = $url . $separator . http_build_query($params);
         $logger->debug('Calling (STREAM): ' . $fullUrl);
 
         try {
