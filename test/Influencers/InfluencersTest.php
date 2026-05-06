@@ -1,6 +1,6 @@
 <?php
 
-class InfluencersTest extends PHPUnit_Framework_TestCase
+class InfluencersTest extends PHPUnit\Framework\TestCase
 {
     private $infUid = '1395be8293373465ab172b8b1b677e31';
     private $infTag = 'traackr-api-test';
@@ -17,7 +17,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     private $savedCustomerKey;
 
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->savedCustomerKey = Traackr\TraackrApi::getCustomerKey();
 
@@ -40,7 +40,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         Traackr\TraackrApi::setJsonOutput(false);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
     }
@@ -110,19 +110,19 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
 
     /**
      * @group read-only
-     * @expectedException Traackr\NotFoundException
      */
     public function testShowNotFound()
     {
+        $this->expectException(\Traackr\NotFoundException::class);
         Traackr\Influencers::show('00000');
     }
 
     /**
      * @group read-only
-     * @expectedException Traackr\MissingParameterException
      */
     public function testShowMissingParameter()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
         Traackr\Influencers::show('');
     }
 
@@ -254,28 +254,28 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
 
     /**
      * @group read-only
-     * @expectedException Traackr\MissingParameterException
      */
     public function testLookupSocialInvalidPlatformParameter()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
         Traackr\Influencers::lookupSocial('dchancogne', '');
     }
 
     /**
      * @group read-only
-     * @expectedException \UnexpectedValueException
      */
     public function testLookupSocialInvalidTypeParameter()
     {
+        $this->expectException(\UnexpectedValueException::class);
         Traackr\Influencers::lookupSocial('dchancogne', 'TWITTER', 'INVALID');
     }
 
     /**
      * @group read-only
-     * @expectedException Traackr\NotFoundException
      */
     public function testLookupSocialNotFound()
     {
+        $this->expectException(\Traackr\NotFoundException::class);
         Traackr\Influencers::lookupSocial('000RandomHandle000');
     }
 
@@ -311,11 +311,9 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($result['influencer'][$this->infTwitterId]['uid'], $this->infUid);
     }
 
-    /**
-     * @expectedException Traackr\MissingParameterException
-     */
     public function testAddSocialByUsernameAndUserId()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
         // this will fail and throw an expected exception
         Traackr\Influencers::addSocial([
             'username' => $this->infTwitterHandle,
@@ -324,33 +322,27 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         ]);
     }
 
-    /**
-     * @expectedException Traackr\MissingParameterException
-     */
     public function testAddSocialMissingUserParam()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
         // this will fail and throw an expected exception
         Traackr\Influencers::addSocial([
             'platform' => 'TWITTER'
         ]);
     }
 
-    /**
-     * @expectedException Traackr\MissingParameterException
-     */
     public function testAddSocialMissingPlatformParam()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
         // this will fail and throw an expected exception
         Traackr\Influencers::addSocial([
             'username' => $this->infTwitterHandle
         ]);
     }
 
-    /**
-     * @expectedException Traackr\UnexpectedValueException
-     */
     public function testAddSocialInvalidPlatformParam()
     {
+        $this->expectException(\UnexpectedValueException::class);
         // this will fail and throw an expected exception
         Traackr\Influencers::addSocial([
             'username' => $this->infTwitterHandle,
@@ -714,11 +706,11 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     /**
      * @group error-check
      * @group read-only
-     * @expectedException Traackr\MissingParameterException
-     * @expectedExceptionMessage Missing parameter: must provide keywords, audience, or social data search parameter
      */
     public function testSearchMissingRequiredParameter()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
+        $this->expectExceptionMessage('Missing parameter: must provide keywords, audience, or social data search parameter');
         Traackr\Influencers::search([]);
     }
 
@@ -833,11 +825,11 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
     /**
      * @group error-check
      * @group read-only
-     * @expectedException Traackr\MissingParameterException
-     * @expectedExceptionMessage Missing parameter: query
      */
     public function testQuickLookupMissingRequiredParameter()
     {
+        $this->expectException(\Traackr\MissingParameterException::class);
+        $this->expectExceptionMessage('Missing parameter: query');
         // this will fail and throw an expected exception
         Traackr\Influencers::quickLookup([]);
     }
@@ -862,7 +854,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
 
         $result = Traackr\Influencers::stream($params);
 
-        $this->assertInternalType('array', $result);
+        $this->assertIsArray($result);
         $this->assertArrayHasKey('page_info', $result);
         $this->assertArrayHasKey('influencers', $result);
 
@@ -879,12 +871,10 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         }
     }
 
-    /**
-     * @expectedException \UnexpectedValueException
-     * @expectedExceptionMessage Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.
-     */
     public function testStreamWithInvalidScoringMode()
     {
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('Scoring mode ENGAGEMENT_RATE_V2 is not supported for streaming endpoint.');
         Traackr\Influencers::stream([
             'scoring_mode' => 'ENGAGEMENT_RATE_V2'
         ]);
@@ -899,7 +889,7 @@ class InfluencersTest extends PHPUnit_Framework_TestCase
         );
 
         $result = Traackr\Influencers::stream($params);
-  
+
         Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
      }
 }

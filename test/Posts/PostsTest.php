@@ -1,12 +1,12 @@
 <?php
 
-class PostsTest extends PHPUnit_Framework_TestCase {
+class PostsTest extends PHPUnit\Framework\TestCase {
 
    private $infUid = '1395be8293373465ab172b8b1b677e31';
 
    private $savedCustomerKey;
 
-   public function setUp() {
+   public function setUp(): void {
 
       $this->savedCustomerKey = Traackr\TraackrApi::getCustomerKey();
 
@@ -15,7 +15,7 @@ class PostsTest extends PHPUnit_Framework_TestCase {
 
    } // End function setUp()
 
-   public function tearDown() {
+   public function tearDown(): void {
 
       Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
 
@@ -83,13 +83,13 @@ class PostsTest extends PHPUnit_Framework_TestCase {
 
       $result = Traackr\Posts::stream($params);
 
-      $this->assertInternalType('array', $result, 'The return method should be an array');
+      $this->assertIsArray($result, 'The return method should be an array');
       $this->assertArrayHasKey('page_info', $result, 'page_info is missing');
       $this->assertArrayHasKey('posts', $result, 'The "posts" key is missing');
 
       $postsGenerator = $result['posts'];
       $this->assertTrue(
-          is_array($postsGenerator) || $postsGenerator instanceof Traversable, 
+          is_array($postsGenerator) || $postsGenerator instanceof Traversable,
           'The value of the "posts" key should be iterable (Generator)'
       );
 
@@ -98,10 +98,10 @@ class PostsTest extends PHPUnit_Framework_TestCase {
          $found = true;
          $this->assertArrayHasKey('influencer_uid', $post, 'The post does not have influencer_uid');
          $this->assertArrayHasKey('url', $post, 'The post does not have url');
-         
-         break; 
+
+         break;
       }
-      
+
    }
 
    /**
@@ -123,7 +123,7 @@ class PostsTest extends PHPUnit_Framework_TestCase {
       $result = Traackr\Posts::stream($params);
 
       $this->assertArrayHasKey('posts', $result);
-      
+
       foreach ($result['posts'] as $post) {
          $this->assertEquals($this->infUid, $post['influencer_uid'], 'The post UID does not match');
          break;

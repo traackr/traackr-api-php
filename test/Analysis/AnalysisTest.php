@@ -1,17 +1,17 @@
 <?php
 
-class AnalysisTest extends PHPUnit_Framework_TestCase {
+class AnalysisTest extends PHPUnit\Framework\TestCase {
 
    private $savedCustomerKey;
 
 
-   public function setUp() {
+   public function setUp(): void {
       $this->savedCustomerKey = Traackr\TraackrApi::getCustomerKey();
       // Ensure outout is PHP by default
       Traackr\TraackrApi::setJsonOutput(false);
    } // End function setUp()
 
-   public function tearDown() {
+   public function tearDown(): void {
       Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
    } // End functiuon tearDown()
 
