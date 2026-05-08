@@ -1,2 +1,7 @@
 <phpunit bootstrap="test/bootstrap.php" colors="true">
+  <testsuites>
+    <testsuite name="traackr-api-php">
+      <directory>test</directory>
+    </testsuite>
+  </testsuites>
 </phpunit>

@@ -1,6 +1,6 @@
 <?php
 
-class AccountMgmtTest extends PHPUnit_Framework_TestCase {
+class AccountMgmtTest extends PHPUnit\Framework\TestCase {
 
    private $infUid = '1395be8293373465ab172b8b1b677e31';
    private $infTag = 'traackr-api-test';
@@ -10,7 +10,7 @@ class AccountMgmtTest extends PHPUnit_Framework_TestCase {
    private $savedCustomerKey;
 
 
-   public function setUp() {
+   public function setUp(): void {
 
       $this->savedCustomerKey = Traackr\TraackrApi::getCustomerKey();
 
@@ -19,7 +19,7 @@ class AccountMgmtTest extends PHPUnit_Framework_TestCase {
 
    } // End function setUp()
 
-   public function tearDown() {
+   public function tearDown(): void {
 
       Traackr\TraackrApi::setCustomerKey($this->savedCustomerKey);
 
@@ -71,11 +71,9 @@ class AccountMgmtTest extends PHPUnit_Framework_TestCase {
 
    } // End function testTagList()
 
-   /**
-    * @expectedException Traackr\InvalidCustomerKeyException
-    */
    public function testSTagListInvalidCustomerKey() {
 
+      $this->expectException(\Traackr\InvalidCustomerKeyException::class);
       Traackr\TraackrApi::setCustomerKey('xxxRandomInvalidCustomerKeyxxxx');
       Traackr\AccountMgmt::tagList();
 

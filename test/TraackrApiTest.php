@@ -1,6 +1,6 @@
 <?php
 
-class TraackrApiTest extends PHPUnit_Framework_TestCase {
+class TraackrApiTest extends PHPUnit\Framework\TestCase {
 
    private $singleHeader = "X-TraackrTest: xxxxx";
 
@@ -27,17 +27,17 @@ class TraackrApiTest extends PHPUnit_Framework_TestCase {
 
       Traackr\TraackrApi::setExtraHeaders($this->singleHeader);
       $h = Traackr\TraackrApi::getExtraHeaders();
-      $this->assertInternalType('array', $h);
+      $this->assertIsArray($h);
       $this->assertEquals(1, sizeof($h));
       $this->assertContains($this->singleHeader, $h);
 
       Traackr\TraackrApi::setExtraHeaders($this->arrayHeader);
       $h = Traackr\TraackrApi::getExtraHeaders();
-      $this->assertInternalType('array', $h);
+      $this->assertIsArray($h);
       $this->assertEquals(2, sizeof($h));
       $this->assertContains($this->arrayHeader[0], $h);
       $this->assertContains($this->arrayHeader[1], $h);
-      
+
    } // End function testGetExtraHeaders
 
 }
