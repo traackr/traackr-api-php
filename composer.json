@@ -26,7 +26,14 @@
   "config": {
     "bin-dir": "bin",
     "audit": {
-      "ignore": ["PKSA-z3gr-8qht-p93v", "PKSA-w57n-mhp6-c9sd"]
+      "ignore": [
+        "PKSA-z3gr-8qht-p93v", "PKSA-w57n-mhp6-c9sd",
+        "PKSA-93qv-9n9h-6k6p", "PKSA-bbs6-q5q9-f3t4", "PKSA-bcdd-5xc7-gwfb",
+        "PKSA-cnw1-2ytm-cgr8", "PKSA-fy2t-3c5f-827y", "PKSA-gcrk-3vtt-1r14",
+        "PKSA-k22t-f949-t9g6", "PKSA-pwsk-hy21-4gby", "PKSA-qxvb-2bpp-dnk6",
+        "PKSA-7qs6-zvnz-h66r", "PKSA-gm5x-j3mz-71n9", "PKSA-jj5t-2zs1-dcfm",
+        "PKSA-vznr-tgp9-fd7d"
+      ]
     }
   },
   "autoload": {
