@@ -23,7 +23,6 @@ abstract class TraackrApiObject
     private $base_headers = [
         'Cache-Control' => 'no-cache',
         'Pragma' => 'no-cache',
-        'Expect' => '', // Avoid 417 errors in some proxies
         'Accept-Charset' => 'utf-8',
         'Accept' => '*/*'
     ];
@@ -37,6 +36,10 @@ abstract class TraackrApiObject
             'verify' => self::$sslVerifyPeer,
             'headers' => $this->base_headers,
             'http_errors' => true, // Guzzle will throw exceptions on 4xx and 5xx errors
+            // Never send "Expect: 100-continue", which some proxies answer with a 417. An empty
+            // Expect header is no better: Tomcat answers that with a 417 too, so the header is
+            // left off entirely.
+            'expect' => false,
         ];
 
         // Initialize Guzzle Client
