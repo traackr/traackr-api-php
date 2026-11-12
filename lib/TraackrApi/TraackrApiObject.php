@@ -156,7 +156,7 @@ abstract class TraackrApiObject
             $separator = (strpos($url, '?') !== false) ? '&' : '?';
             $fullUrl .= $separator . http_build_query($queryParams);
         }
-        $logger->debug("Calling ({$method}): {$fullUrl}");
+        $logger->debug('Calling (' . $method . '): ' . self::redactApiKey($fullUrl));
 
         try {
             $response = $this->client->request($method, $url, $options);
@@ -192,7 +192,7 @@ abstract class TraackrApiObject
             if ($httpcode === 404) {
                 $message = 'API resource not found (HTTP 404)';
                 $logger->error($message);
-                throw new NotFoundException($message . ': ' . $url, $httpcode, $e);
+                throw new NotFoundException($message . ': ' . self::redactApiKey($url), $httpcode, $e);
             }
 
             // Other 4xx error
@@ -212,7 +212,7 @@ abstract class TraackrApiObject
 
         } catch (RequestException $e) {
             // Handle network errors (timeout, DNS, etc.)
-            $message = 'API call failed: ' . $e->getMessage();
+            $message = 'API call failed: ' . self::redactApiKey($e->getMessage());
             $logger->error($message);
             throw new TraackrApiException($message, 0, $e);
         }
@@ -362,7 +362,7 @@ abstract class TraackrApiObject
 
         $separator = (strpos($url, '?') !== false) ? '&' : '?';
         $fullUrl = $url . $separator . http_build_query($params);
-        $logger->debug('Calling (STREAM): ' . $fullUrl);
+        $logger->debug('Calling (STREAM): ' . self::redactApiKey($fullUrl));
 
         try {
             // 1. Request with real stream
@@ -448,11 +448,42 @@ abstract class TraackrApiObject
             $message = 'Invalid JSON response: ' . $e->getMessage();
             $logger->error($message);
             throw new TraackrApiException($message, 0, $e);
+        } catch (RequestException $e) {
+            // Guzzle's message carries the URL (and its api_key) but not the body, which is the only
+            // place search-api says why it rejected the call. The stream body is not seekable: read it once.
+            if (!$e->hasResponse()) {
+                $message = 'API stream call failed: ' . self::redactApiKey($e->getMessage());
+                $logger->error($message);
+                throw new TraackrApiException($message, 0, $e);
+            }
+            try {
+                $body = $e->getResponse()->getBody()->read(2048);
+            } catch (\RuntimeException $readError) {
+                $body = '(response body unreadable: ' . $readError->getMessage() . ')';
+            }
+            $message = 'API stream call failed (HTTP ' . $e->getResponse()->getStatusCode() . ') '
+                . $e->getRequest()->getMethod() . ' ' . self::redactApiKey((string) $e->getRequest()->getUri())
+                . ': ' . self::redactApiKey($body);
+            $logger->error($message);
+            throw new TraackrApiException($message, 0, $e);
         } catch (\Exception $e) {
-            $message = 'API stream call failed: ' . $e->getMessage();
+            $message = 'API stream call failed: ' . self::redactApiKey($e->getMessage());
             $logger->error($message);
             throw new TraackrApiException($message, 0, $e);
         }
+    }
+
+    // Every request carries the api_key in its URL, and log lines and exception messages end up in
+    // files and shell output that are not access-controlled like the key.
+    private static function redactApiKey($text)
+    {
+        $text = preg_replace('/(' . preg_quote(PARAM_API_KEY, '/') . '=)[^&\s`\'"]+/', '$1[REDACTED]', $text);
+        // A response body can echo the key without the parameter name
+        $key = TraackrApi::getApiKey();
+        if (!empty($key)) {
+            $text = str_replace([$key, rawurlencode($key)], '[REDACTED]', $text);
+        }
+        return $text;
     }
 
     /**
