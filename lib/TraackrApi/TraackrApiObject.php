@@ -142,7 +142,7 @@ abstract class TraackrApiObject
     private function request($method, $url, $options, $decode, $isStream = false)
     {
         $logger = TraackrAPI::getLogger();
-        $logger->debug('Calling (' . $method . '): ' . self::redactApiKey($url), $options);
+        $logger->debug('Calling (' . $method . '): ' . self::redactApiKey($url));
 
         try {
             $response = $this->client->request($method, $url, $options);
@@ -346,7 +346,8 @@ abstract class TraackrApiObject
             )
         ];
 
-        $fullUrl = $url . '?' . http_build_query($params);
+        $separator = (strpos($url, '?') !== false) ? '&' : '?';
+        $fullUrl = $url . $separator . http_build_query($params);
         $logger->debug('Calling (STREAM): ' . self::redactApiKey($fullUrl));
 
         try {
