@@ -176,17 +176,17 @@ abstract class TraackrApiObject
                 if ($body === 'Customer key not found') {
                     $message = 'Invalid Customer Key (HTTP 400)';
                     $logger->error($message);
-                    throw new InvalidCustomerKeyException($message . ': ' . $body, $httpcode, $e);
+                    throw new InvalidCustomerKeyException($message . ': ' . self::redactApiKey($body), $httpcode, $e);
                 }
                 $message = 'Missing or Invalid argument/parameter (HTTP 400)';
                 $logger->error($message);
-                throw new MissingParameterException($message . ': ' . $body, $httpcode, $e);
+                throw new MissingParameterException($message . ': ' . self::redactApiKey($body), $httpcode, $e);
             }
 
             if ($httpcode === 403) {
                 $message = 'Invalid API key (HTTP 403)';
                 $logger->error($message);
-                throw new InvalidApiKeyException($message . ': ' . $body, $httpcode, $e);
+                throw new InvalidApiKeyException($message . ': ' . self::redactApiKey($body), $httpcode, $e);
             }
 
             if ($httpcode === 404) {
@@ -198,7 +198,7 @@ abstract class TraackrApiObject
             // Other 4xx error
             $message = 'API HTTP Error (HTTP ' . $httpcode . ')';
             $logger->error($message);
-            throw new TraackrApiException($message . ': ' . $body, $httpcode, $e);
+            throw new TraackrApiException($message . ': ' . self::redactApiKey($body), $httpcode, $e);
 
         } catch (ServerException $e) {
             // Handle 5xx errors
@@ -208,7 +208,7 @@ abstract class TraackrApiObject
             $message = 'API HTTP Error (HTTP ' . $httpcode . ')';
 
             $logger->error($message);
-            throw new TraackrApiException($message . ': ' . $body, $httpcode, $e);
+            throw new TraackrApiException($message . ': ' . self::redactApiKey($body), $httpcode, $e);
 
         } catch (RequestException $e) {
             // Handle network errors (timeout, DNS, etc.)
@@ -231,7 +231,7 @@ abstract class TraackrApiObject
             if (json_last_error() !== JSON_ERROR_NONE) {
                  $message = 'Failed to decode JSON response: ' . json_last_error_msg();
                  $logger->error($message);
-                 throw new TraackrApiException($message . ': ' . $body);
+                 throw new TraackrApiException($message . ': ' . self::redactApiKey($body));
             }
         } else {
             $rez = $body;
@@ -450,20 +450,20 @@ abstract class TraackrApiObject
             throw new TraackrApiException($message, 0, $e);
         } catch (RequestException $e) {
             // Guzzle's message carries the URL (and its api_key) but not the body, which is the only
-            // place search-api says why it rejected the call. The stream body is not seekable: read it once.
+            // place search-api says why it rejected the call.
             if (!$e->hasResponse()) {
                 $message = 'API stream call failed: ' . self::redactApiKey($e->getMessage());
                 $logger->error($message);
                 throw new TraackrApiException($message, 0, $e);
             }
             try {
-                $body = $e->getResponse()->getBody()->read(2048);
+                $body = self::bodyExcerpt($e->getResponse()->getBody());
             } catch (\RuntimeException $readError) {
-                $body = '(response body unreadable: ' . $readError->getMessage() . ')';
+                $body = '(response body unreadable: ' . self::redactApiKey($readError->getMessage()) . ')';
             }
             $message = 'API stream call failed (HTTP ' . $e->getResponse()->getStatusCode() . ') '
                 . $e->getRequest()->getMethod() . ' ' . self::redactApiKey((string) $e->getRequest()->getUri())
-                . ': ' . self::redactApiKey($body);
+                . ': ' . $body;
             $logger->error($message);
             throw new TraackrApiException($message, 0, $e);
         } catch (\Exception $e) {
@@ -477,13 +477,37 @@ abstract class TraackrApiObject
     // files and shell output that are not access-controlled like the key.
     private static function redactApiKey($text)
     {
-        $text = preg_replace('/(' . preg_quote(PARAM_API_KEY, '/') . '=)[^&\s`\'"]+/', '$1[REDACTED]', $text);
-        // A response body can echo the key without the parameter name
+        // The literal key goes first: a response body can echo it without the parameter name, and a key
+        // holding '&' or whitespace would otherwise be split by the pattern below
         $key = TraackrApi::getApiKey();
         if (!empty($key)) {
-            $text = str_replace([$key, rawurlencode($key)], '[REDACTED]', $text);
+            $text = str_replace([$key, rawurlencode($key), urlencode($key)], '[REDACTED]', $text);
         }
-        return $text;
+        // Covers a key passed per call in the parameters rather than set globally
+        return preg_replace('/(' . preg_quote(PARAM_API_KEY, '/') . '=)[^&\s`\'"]+/', '$1[REDACTED]', $text);
+    }
+
+    // Up to 2 KB of a streamed response body for an error message, on one line of valid UTF-8 so a body
+    // cannot forge log lines or break a JSON encoder. A single read() on a network stream returns whatever
+    // has arrived, so it loops.
+    private static function bodyExcerpt($stream)
+    {
+        $key = (string) TraackrApi::getApiKey();
+        $forms = $key === '' ? [] : array_unique([$key, rawurlencode($key), urlencode($key)]);
+        $margin = empty($forms) ? 0 : max(array_map('strlen', $forms));
+        $text = self::redactApiKey(\GuzzleHttp\Psr7\copy_to_string($stream, 2048 + $margin));
+        // The read limit can cut a key form short, and redaction and folding shrink the text before the
+        // cut below, which would pull that fragment inside it
+        foreach ($forms as $form) {
+            for ($n = min(strlen($form) - 1, strlen($text)); $n > 0; $n--) {
+                if (substr($text, -$n) === substr($form, 0, $n)) {
+                    $text = substr($text, 0, -$n);
+                    break;
+                }
+            }
+        }
+        $text = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $text);
+        return mb_scrub(mb_strcut($text, 0, 2048, 'UTF-8'), 'UTF-8');
     }
 
     /**
