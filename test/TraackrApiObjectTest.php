@@ -170,6 +170,21 @@ class TraackrApiObjectTest extends PHPUnit\Framework\TestCase {
    } // End function testShrinkingTheBodyDoesNotPullAKeyFragmentIntoTheExcerpt
 
    /**
+    * Only a read cut short by the limit can end in a key fragment, so a body read whole keeps its tail.
+    *
+    * @group read-only
+    */
+   public function testCompleteShortBodyKeepsItsLastCharacters() {
+
+      Traackr\TraackrApi::setApiKey('e0123456789abcdef0123456789abcde');
+
+      $e = $this->streamError(400, 'Report 351542 is unavailable');
+
+      $this->assertStringEndsWith(': Report 351542 is unavailable', $e->getMessage());
+
+   } // End function testCompleteShortBodyKeepsItsLastCharacters
+
+   /**
     * A body must not be able to forge log lines or break a JSON encoder downstream.
     *
     * @group read-only
