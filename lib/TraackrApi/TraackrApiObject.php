@@ -481,14 +481,18 @@ abstract class TraackrApiObject
         $key = (string) TraackrApi::getApiKey();
         $forms = $key === '' ? [] : array_unique([$key, rawurlencode($key), urlencode($key)]);
         $margin = empty($forms) ? 0 : max(array_map('strlen', $forms));
-        $text = self::redactApiKey(\GuzzleHttp\Psr7\copy_to_string($stream, 2048 + $margin));
+        $raw = \GuzzleHttp\Psr7\copy_to_string($stream, 2048 + $margin);
+        $text = self::redactApiKey($raw);
         // The read limit can cut a key form short, and redaction and folding shrink the text before the
-        // cut below, which would pull that fragment inside it
-        foreach ($forms as $form) {
-            for ($n = min(strlen($form) - 1, strlen($text)); $n > 0; $n--) {
-                if (substr($text, -$n) === substr($form, 0, $n)) {
-                    $text = substr($text, 0, -$n);
-                    break;
+        // cut below, which would pull that fragment inside it. A body read whole has no cut key, and
+        // stripping it would trim a tail that only looks like the start of one.
+        if (strlen($raw) === 2048 + $margin) {
+            foreach ($forms as $form) {
+                for ($n = min(strlen($form) - 1, strlen($text)); $n > 0; $n--) {
+                    if (substr($text, -$n) === substr($form, 0, $n)) {
+                        $text = substr($text, 0, -$n);
+                        break;
+                    }
                 }
             }
         }
